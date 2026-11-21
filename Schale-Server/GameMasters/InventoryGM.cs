@@ -264,9 +264,10 @@ namespace Schale.GameMasters
             var itemExcel = connection.ExcelTableService.GetTable<ItemExcelT>();
             var equipmentExcel = connection.ExcelTableService.GetTable<EquipmentExcelT>();
 
-            // Time-limited items (event/recruitment tickets with an ExpirationDateTime) only trigger the client's
-            // "An item is expiring" popup on every login, so they are never part of "add all".
-            static bool Expires(ItemExcelT x) => !string.IsNullOrWhiteSpace(x.ExpirationDateTime);
+            // Time-limited items (ExpirationDateTime) and recruitment tickets only trigger the client's
+            // "An item is expiring" / "unused Choice Ticket" popups, so they are never part of "add all".
+            // Recruitment tickets (RecruitCoin) belong to dated banners, so the client nags "unused Choice Ticket" for them too.
+            static bool Expires(ItemExcelT x) => !string.IsNullOrWhiteSpace(x.ExpirationDateTime) || x.ItemCategory == ItemCategory.RecruitCoin;
             static long BulkCount(ItemExcelT x) => x.StackableMax - 100 <= 0 ? 1 : (long)Math.Floor((double)x.StackableMax / 2);
 
             // Undo what older builds of this command added: expiring items still holding exactly the bulk amount.

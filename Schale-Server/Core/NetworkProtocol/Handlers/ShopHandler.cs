@@ -57,12 +57,13 @@ public class ShopHandler : ProtocolHandlerBase
             })
             .ToList();
 
-        response.ShopRecruits = GetActiveRecruitBanners(_excelService, DateTime.UtcNow);
+        var ownedItems = db.Items.Where(x => x.AccountServerId == account.ServerId && x.StackCount > 0).Select(x => x.UniqueId).ToHashSet();
+        response.ShopRecruits = GetActiveRecruitBanners(_excelService, DateTime.UtcNow, ownedItems);
 
         return response;
     }
 
-    public static List<ShopRecruitDB> GetActiveRecruitBanners(ExcelTableService excelService, DateTime now)
+    public static List<ShopRecruitDB> GetActiveRecruitBanners(ExcelTableService excelService, DateTime now, ISet<long>? ownedItemIds = null)
     {
         var recruits = excelService.GetTable<ShopRecruitExcelT>();
         if (recruits == null || recruits.Count == 0)
@@ -109,7 +110,23 @@ public class ShopHandler : ProtocolHandlerBase
             : pickupCandidates.OrderByDescending(r => r.Id).Take(10));
 
         // 3. Active Ticket gacha banners (avoid flooding with expired historical ticket banners)
-        var activeTickets = recruits.Where(r => r.CategoryType == ShopCategoryType.TicketGacha && IsActivePeriod(r, now)).ToList();
+        // Like official, a ticket banner (Start Dash, Selective, Precision...) only shows while the account holds its ticket;
+        // they share key art, so listing every open one shows a column of identical banners.
+        var goods = excelService.GetTable<GoodsExcelT>().ToDictionary(g => g.Id);
+        bool HasTicket(ShopRecruitExcelT r)
+        {
+            if (ownedItemIds == null) return true;
+            var ticketIds = new[] { r.OneGachaGoodsId, r.TenGachaGoodsId }
+                .Where(id => goods.ContainsKey(id))
+                .SelectMany(id => goods[id].ConsumeParcelType.Zip(goods[id].ConsumeParcelId))
+                .Where(p => p.First == ParcelType.Item)
+                .Select(p => p.Second)
+                .Append(r.RecruitCoinId)
+                .Where(id => id != 0)
+                .ToList();
+            return ticketIds.Count == 0 || ticketIds.Any(ownedItemIds.Contains);
+        }
+        var activeTickets = recruits.Where(r => r.CategoryType == ShopCategoryType.TicketGacha && IsActivePeriod(r, now) && HasTicket(r)).ToList();
         selected.AddRange(activeTickets);
 
         return selected.DistinctBy(b => b.Id).Select(ToBannerDB).ToList();
