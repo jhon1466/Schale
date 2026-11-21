@@ -38,7 +38,7 @@ public class MissionService
                        m.Category == MissionCategory.Achievement ||
                        // Challenge is the per-stage "clear it in N turns" mission. Official sends these in MissionProgressDBs like any other (30150 on the campaign clear), and Mission_List serves them from the same storage. Every Reset_CompleteCampaignStageMinimumTurn row is Challenge.
                        m.Category == MissionCategory.Challenge)
-            .Select(m => new { m.Id, m.CompleteConditionParameter, m.CompleteConditionCount, IsBattlePass = false })
+            .Select(m => new { m.Id, m.CompleteConditionParameter, m.CompleteConditionCount, IsBattlePass = false, m.ResetType })
             .ToList();
 
         // BattlePass missions share the MissionProgresses storage (BattlePass_MissionList serves them from it), but they must never reach the returned list: handlers attach it to client responses as MissionProgressDBs,
@@ -46,12 +46,13 @@ public class MissionService
         // Progress is still persisted for both kinds below.
         var relevantBpMissions = battlePassMissionExcels
             .Where(m => m.CompleteConditionType == conditionType)
-            .Select(m => new { m.Id, m.CompleteConditionParameter, m.CompleteConditionCount, IsBattlePass = true })
+            .Select(m => new { m.Id, m.CompleteConditionParameter, m.CompleteConditionCount, IsBattlePass = true, ResetType = MissionResetType.None })
             .ToList();
 
         relevantMissions.AddRange(relevantBpMissions);
 
         var lowerIsBetter = IsLowerBetter(conditionType);
+        var now = account.GameSettings.ServerDateTime();
 
         foreach (var mission in relevantMissions)
         {
@@ -69,6 +70,15 @@ public class MissionService
             var existingMission = context.MissionProgresses
                 .FirstOrDefault(m => m.AccountServerId == account.ServerId &&
                                    m.MissionUniqueId == mission.Id);
+
+            // Daily/weekly rows are reused across days: a row started before the current window is stale progress, start it over
+            // (otherwise a task done yesterday stays "complete" and never counts again).
+            if (existingMission != null && IsStale(mission.ResetType, existingMission.StartTime, now))
+            {
+                existingMission.StartTime = now;
+                existingMission.ProgressParameters = new Dictionary<long, long>();
+                existingMission.Complete = false;
+            }
 
             if (existingMission != null && existingMission.Complete)
                 continue;
@@ -106,6 +116,51 @@ public class MissionService
         }
 
         return updatedMissions;
+    }
+
+    // Same windows as MissionHandler.CurrentWindowClaims: the game day rolls at 04:00 and weeks start on Monday.
+    internal static (DateTime Day, DateTime Week) WindowStarts(DateTime now)
+    {
+        var day = (now.TimeOfDay < TimeSpan.FromHours(4) ? now.AddDays(-1) : now).Date.AddHours(4);
+        return (day, day.AddDays(-(((int)day.DayOfWeek + 6) % 7)));
+    }
+
+    private static bool IsStale(MissionResetType resetType, DateTime startTime, DateTime now)
+    {
+        var (day, week) = WindowStarts(now);
+        return resetType switch
+        {
+            MissionResetType.Daily => startTime < day,
+            MissionResetType.Weekly => startTime < week,
+            _ => false,
+        };
+    }
+
+    /// <summary>Login-driven tasks: daily login, logins-per-week (once per game day) and "log in between HHMM and HHMM".</summary>
+    public List<MissionProgressDB> TickLogin(SchaleDataContext context, AccountDBServer account)
+    {
+        var now = account.GameSettings.ServerDateTime();
+        var (day, _) = WindowStarts(now);
+        var dailyLoginIds = _excelService.GetTable<MissionExcelT>()
+            .Where(m => m.CompleteConditionType == MissionCompleteConditionType.Reset_DailyLogin)
+            .Select(m => m.Id).ToHashSet();
+        var alreadyToday = context.MissionProgresses.Any(m => m.AccountServerId == account.ServerId
+            && dailyLoginIds.Contains(m.MissionUniqueId) && m.Complete && m.StartTime >= day);
+
+        var result = UpdateMissionProgress(context, account, MissionCompleteConditionType.Reset_DailyLogin, 1);
+        if (!alreadyToday)
+            result.AddRange(UpdateMissionProgress(context, account, MissionCompleteConditionType.Reset_DailyLoginCount, 1));
+
+        // Parameters are a [from, to] window as HHMM on a 04:00-based day (2800 = 04:00 next morning).
+        var hhmm = now.Hour * 100 + now.Minute;
+        if (hhmm < 400) hhmm += 2400;
+        foreach (var m in _excelService.GetTable<MissionExcelT>().Where(m => m.CompleteConditionType == MissionCompleteConditionType.Reset_LoginAtSpecificTime))
+        {
+            var p = m.CompleteConditionParameter;
+            if (p is { Count: >= 2 } && hhmm >= p[0] && hhmm < p[1])
+                result.AddRange(UpdateMissionProgress(context, account, MissionCompleteConditionType.Reset_LoginAtSpecificTime, 1, p[0]));
+        }
+        return result;
     }
 
     // Conditions whose progress is a personal best rather than a running total - the target is a ceiling to get under, so a smaller number is further along.

@@ -57,7 +57,7 @@ public class ActionPointOverflowTests
         Assert.Empty(db.Mails);
     }
 
-    private static ParcelHandler Handler() => new(Excels, Mapper);
+    private static ParcelHandler Handler() => new(Excels, Mapper, new MissionService(Excels, Mapper));
 
     private static readonly ExcelTableService Excels = LoadExcels();
 

@@ -113,7 +113,7 @@ public class CampaignRewardGatingTests
     private static long FirstNormalStage() =>
         Excels.GetTable<CampaignChapterExcelT>().First(x => x.NormalCampaignStageId is { Count: > 0 }).NormalCampaignStageId[0];
 
-    private static CampaignManager Manager() => new(Excels, new ParcelHandler(Excels, Mapper), Mapper);
+    private static CampaignManager Manager() => new(Excels, new ParcelHandler(Excels, Mapper, new MissionService(Excels, Mapper)), Mapper);
 
     private static readonly ExcelTableService Excels = LoadExcels();
 

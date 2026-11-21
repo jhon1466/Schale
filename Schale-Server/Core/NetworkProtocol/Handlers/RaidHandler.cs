@@ -24,14 +24,18 @@ public class RaidHandler : ProtocolHandlerBase
     private readonly RaidManager _raidManager;
     private readonly ParcelHandler _parcelHandler;
 
+        private readonly MissionService _missions;
+
     public RaidHandler(
         IProtocolHandlerRegistry registry,
         ISessionKeyService sessionService,
         ExcelTableService excelService,
         IMapper mapper,
         RaidManager raidManager,
-        ParcelHandler parcelHandler) : base(registry)
+        ParcelHandler parcelHandler,
+        MissionService missionService) : base(registry)
     {
+        _missions = missionService;
         _sessionService = sessionService;
         _excelService = excelService;
         _mapper = mapper;
@@ -179,7 +183,15 @@ public class RaidHandler : ProtocolHandlerBase
         response.RaidBattleDB = raidBattleDB.ToMap(_mapper);
         response.AccountCurrencyDB = db.GetAccountCurrencies(account.ServerId).FirstMapTo(_mapper);
         response.ServerTimeTicks = _raidManager.GetRaidTimeTicks(account).Ticks;
+        // Entering a Total Assault battle: "join raid" tasks and "use a raid ticket" (currency 8).
         response.MissionProgressDBs = [];
+        if (!request.IsPractice)
+        {
+            response.MissionProgressDBs.AddRange(_missions.UpdateMissionProgress(db, account, MissionCompleteConditionType.Reset_JoinSpecificRaidCount, 1, request.RaidUniqueId));
+            response.MissionProgressDBs.AddRange(_missions.UpdateMissionProgress(db, account, MissionCompleteConditionType.Achieve_JoinRaidCount, 1));
+            response.MissionProgressDBs.AddRange(_missions.UpdateMissionProgress(db, account, MissionCompleteConditionType.Reset_UseTiket, 1, (long)CurrencyTypes.RaidTicket));
+            await db.SaveChangesAsync();
+        }
 
         if (request.AssistUseInfo != null)
         {

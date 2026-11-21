@@ -62,7 +62,7 @@ public class MailCharacterStarTests
         return new ExcelTableService();
     }
 
-    private static ParcelHandler Handler() => new(Excels, Mapper);
+    private static ParcelHandler Handler() => new(Excels, Mapper, new MissionService(Excels, Mapper));
 
     private static SchaleDataContext NewContext()
     {

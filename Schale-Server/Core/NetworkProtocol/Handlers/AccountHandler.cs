@@ -299,7 +299,7 @@ public class AccountHandler : ProtocolHandlerBase
         ArgumentNullException.ThrowIfNull(account);
         _logger.LogInformation("GetAuthenticatedUser took {Ms}ms", sw.ElapsedMilliseconds);
 
-        _missionService.UpdateMissionProgress(db, account, MissionCompleteConditionType.Reset_DailyLogin, 1);
+        _missionService.TickLogin(db, account);
         await db.SaveChangesAsync();
 
         sw.Restart();

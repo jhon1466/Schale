@@ -1,3 +1,4 @@
+using Schale.MX.Logic.Battles;
 using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using BlueArchiveAPI.Services;
@@ -18,12 +19,19 @@ public class WeekDungeonHandler : ProtocolHandlerBase
     private readonly WeekDungeonManager _weekDungeonManager;
     private readonly IMapper _mapper;
 
+        private readonly MissionService _missions;
+    private readonly ExcelTableService _excel;
+
     public WeekDungeonHandler(
         IProtocolHandlerRegistry registry,
         ISessionKeyService sessionService,
         WeekDungeonManager weekDungeonManager,
-        IMapper mapper) : base(registry)
+        IMapper mapper,
+        MissionService missionService,
+        ExcelTableService excel) : base(registry)
     {
+        _excel = excel;
+        _missions = missionService;
         _sessionService = sessionService;
         _weekDungeonManager = weekDungeonManager;
         _mapper = mapper;
@@ -68,6 +76,15 @@ public class WeekDungeonHandler : ProtocolHandlerBase
         var (historyDb, parcelResultDb) = await _weekDungeonManager.WeekDungeonBattleResult(db, account, request);
 
         response.WeekDungeonStageHistoryDB = historyDb.ToMap(_mapper);
+        if (request.Summary?.EndType == BattleEndType.Clear)
+        {
+            var type = _excel.GetTable<WeekDungeonExcelT>().FirstOrDefault(x => x.StageId == request.StageUniqueId)?.WeekDungeonType ?? WeekDungeonType.None;
+            var condition = type is WeekDungeonType.FindGift or WeekDungeonType.Blood
+                ? MissionCompleteConditionType.Achieve_ClearFindGiftAndBloodDungeonCount
+                : MissionCompleteConditionType.Achieve_ClearChaserDungeonCount;
+            response.MissionProgressDBs = _missions.UpdateMissionProgress(db, account, condition, 1);
+            await db.SaveChangesAsync();
+        }
         response.LevelUpCharacterDBs = new();
         response.ParcelResultDB = parcelResultDb;
 

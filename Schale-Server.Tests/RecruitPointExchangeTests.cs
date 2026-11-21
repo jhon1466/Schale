@@ -135,7 +135,7 @@ public class RecruitPointExchangeTests
     }
 
     private static ShopManager Manager() =>
-        new(Excels, new SharedDataCacheService(Excels), new ParcelHandler(Excels, Mapper), Mapper);
+        new(Excels, new SharedDataCacheService(Excels), new ParcelHandler(Excels, Mapper, new MissionService(Excels, Mapper)), Mapper);
 
     private static SchaleDataContext NewContext()
     {

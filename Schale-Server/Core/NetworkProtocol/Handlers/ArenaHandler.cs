@@ -24,13 +24,17 @@ public class ArenaHandler : ProtocolHandlerBase
     private readonly ParcelHandler _parcelHandler;
     private readonly IMapper _mapper;
 
+        private readonly MissionService _missions;
+
     public ArenaHandler(
         IProtocolHandlerRegistry registry,
         ISessionKeyService sessionService,
         ExcelTableService excelService,
         ParcelHandler parcelHandler,
-        IMapper mapper) : base(registry)
+        IMapper mapper,
+        MissionService missionService) : base(registry)
     {
+        _missions = missionService;
         _sessionService = sessionService;
         _excelService = excelService;
         _parcelHandler = parcelHandler;
@@ -226,6 +230,11 @@ public class ArenaHandler : ProtocolHandlerBase
         }
 
         response.AccountCurrencyDB ??= db.GetAccountCurrencies(account.ServerId).FirstMapTo(_mapper);
+
+        // A tactical challenge entered: "join arena" and "use an arena ticket" (currency 7) tasks.
+        response.MissionProgressDBs = _missions.UpdateMissionProgress(db, account, MissionCompleteConditionType.Achieve_JoinArenaCount, 1);
+        response.MissionProgressDBs.AddRange(_missions.UpdateMissionProgress(db, account, MissionCompleteConditionType.Reset_UseTiket, ticketCost, (long)CurrencyTypes.ArenaTicket));
+        await db.SaveChangesAsync();
 
         return response;
     }

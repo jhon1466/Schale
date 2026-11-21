@@ -28,8 +28,11 @@ public class ParcelHandler
     private readonly List<CostumeExcelT> _costumeExcels;
     private readonly List<CurrencyExcelT> _currencyExcels;
 
-    public ParcelHandler(ExcelTableService excelService, IMapper mapper)
+    private readonly MissionService _missionService;
+
+    public ParcelHandler(ExcelTableService excelService, IMapper mapper, MissionService missionService)
     {
+        _missionService = missionService;
         _excelService = excelService;
         _mapper = mapper;
 
@@ -175,6 +178,16 @@ public class ParcelHandler
             }
 
             await parcelResolver.FinalizeUpdates(transaction);
+
+            // Every AP spend (stages, dungeons, sweeps...) goes through here, so the "use N AP" dailies are counted once, centrally.
+            var apSpent = -filteredParcels
+                .Where(p => p.Type == ParcelType.Currency && p.Id == (long)CurrencyTypes.ActionPoint && p.Amount < 0)
+                .Sum(p => p.Amount);
+            if (apSpent > 0)
+            {
+                _missionService.UpdateMissionProgress(context, account, MissionCompleteConditionType.Reset_UseActionPoint, apSpent);
+                await context.SaveChangesAsync();
+            }
 
             if (!isConsume)
             {

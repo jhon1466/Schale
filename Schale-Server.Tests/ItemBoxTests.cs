@@ -139,7 +139,7 @@ public class ItemBoxTests
         return new ExcelTableService();
     }
 
-    private static ItemManager Manager() => new(Excels, new ParcelHandler(Excels, Mapper));
+    private static ItemManager Manager() => new(Excels, new ParcelHandler(Excels, Mapper, new MissionService(Excels, Mapper)));
 
     private static (ItemExcelT, RecipeSelectionGroupExcelT) FurnitureSelectBox()
     {

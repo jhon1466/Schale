@@ -1,3 +1,4 @@
+using Schale.MX.Logic.Battles;
 using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using BlueArchiveAPI.Services;
@@ -18,12 +19,16 @@ public class SchoolDungeonHandler : ProtocolHandlerBase
     private readonly SchoolDungeonManager _schoolDungeonManager;
     private readonly IMapper _mapper;
 
+        private readonly MissionService _missions;
+
     public SchoolDungeonHandler(
         IProtocolHandlerRegistry registry,
         ISessionKeyService sessionService,
         SchoolDungeonManager schoolDungeonManager,
-        IMapper mapper) : base(registry)
+        IMapper mapper,
+        MissionService missionService) : base(registry)
     {
+        _missions = missionService;
         _sessionService = sessionService;
         _schoolDungeonManager = schoolDungeonManager;
         _mapper = mapper;
@@ -67,6 +72,11 @@ public class SchoolDungeonHandler : ProtocolHandlerBase
         var (historyDb, parcelResultDb) = await _schoolDungeonManager.SchoolDungeonBattleResult(db, account, request);
 
         response.SchoolDungeonStageHistoryDB = historyDb.ToMap(_mapper);
+        if (request.Summary?.EndType == BattleEndType.Clear)
+        {
+            response.MissionProgressDBs = _missions.UpdateMissionProgress(db, account, MissionCompleteConditionType.Achieve_ClearSchoolDungeonCount, 1);
+            await db.SaveChangesAsync();
+        }
         response.LevelUpCharacterDBs = new();
         response.ParcelResultDB = parcelResultDb;
 

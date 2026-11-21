@@ -133,7 +133,7 @@ public class MomoTalkReadTests
         return new ExcelTableService();
     }
 
-    private static MomoTalkHandler Handler() => new(null!, new FixedSessionService(), Excels, Mapper, new ParcelHandler(Excels, Mapper));
+    private static MomoTalkHandler Handler() => new(null!, new FixedSessionService(), Excels, Mapper, new ParcelHandler(Excels, Mapper, new MissionService(Excels, Mapper)));
 
     private static SessionKey Key(AccountDBServer account) => new() { AccountServerId = account.ServerId, MxToken = "t" };
 

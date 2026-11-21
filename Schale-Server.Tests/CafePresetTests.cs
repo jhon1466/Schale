@@ -164,7 +164,7 @@ public class CafePresetTests
     }
 
     private static CafeManager Manager() =>
-        new(Excels, new ParcelHandler(Excels, Mapper), new ConsumeHandler(Excels, Mapper), Mapper);
+        new(Excels, new ParcelHandler(Excels, Mapper, new MissionService(Excels, Mapper)), new ConsumeHandler(Excels, Mapper), Mapper);
 
     private static CafeDBServer NewCafe(SchaleDataContext db, AccountDBServer account)
     {

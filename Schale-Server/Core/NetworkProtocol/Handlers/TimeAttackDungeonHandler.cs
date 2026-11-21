@@ -21,12 +21,16 @@ public class TimeAttackDungeonHandler : ProtocolHandlerBase
     private readonly TimeAttackDungeonManager _timeAttackDungeonManager;
     private readonly IMapper _mapper;
 
+        private readonly MissionService _missions;
+
     public TimeAttackDungeonHandler(
         IProtocolHandlerRegistry registry,
         ISessionKeyService sessionService,
         TimeAttackDungeonManager timeAttackDungeonManager,
-        IMapper mapper) : base(registry)
+        IMapper mapper,
+        MissionService missionService) : base(registry)
     {
+        _missions = missionService;
         _sessionService = sessionService;
         _timeAttackDungeonManager = timeAttackDungeonManager;
         _mapper = mapper;
@@ -159,6 +163,9 @@ public class TimeAttackDungeonHandler : ProtocolHandlerBase
             }
             return response;
         }
+
+        response.MissionProgressDBs = _missions.UpdateMissionProgress(db, account, MissionCompleteConditionType.Reset_ClearTimeAttackDungeonCount, 1);
+        await db.SaveChangesAsync();
 
         var targetGeas = _timeAttackDungeonManager.GetTADGeas(request.Summary.StageId);
         var dungeonResult = await _timeAttackDungeonManager.BattleResult(db, account, request.Summary);

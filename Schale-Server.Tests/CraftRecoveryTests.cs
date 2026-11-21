@@ -125,7 +125,7 @@ public class CraftRecoveryTests
 
     private static CraftHandler Handler() => new(
         null!, new FixedSessionService(), Excels, Mapper,
-        new ConsumeHandler(Excels, Mapper), new ParcelHandler(Excels, Mapper), new MissionService(Excels, Mapper));
+        new ConsumeHandler(Excels, Mapper), new ParcelHandler(Excels, Mapper, new MissionService(Excels, Mapper)), new MissionService(Excels, Mapper));
 
     private static SessionKey Key(AccountDBServer account) => new() { AccountServerId = account.ServerId, MxToken = "t" };
 

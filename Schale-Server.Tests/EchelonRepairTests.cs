@@ -61,8 +61,8 @@ public class EchelonRepairTests
         null!, new FixedSessionService(), Excels, Mapper,
         LoggerFactory.Create(b => { }).CreateLogger<AccountHandler>(),
         new MissionService(Excels, Mapper), new AttendanceService(Excels),
-        new ParcelHandler(Excels, Mapper),
-        new CafeManager(Excels, new ParcelHandler(Excels, Mapper), new ConsumeHandler(Excels, Mapper), Mapper));
+        new ParcelHandler(Excels, Mapper, new MissionService(Excels, Mapper)),
+        new CafeManager(Excels, new ParcelHandler(Excels, Mapper, new MissionService(Excels, Mapper)), new ConsumeHandler(Excels, Mapper), Mapper));
 
     private static SessionKey Key(AccountDBServer account) => new() { AccountServerId = account.ServerId, MxToken = "t" };
 
@@ -88,7 +88,7 @@ public class EchelonRepairTests
         var account = new AccountDBServer { ServerId = 1, Nickname = "Sensei1", Level = 1 };
         context.Accounts.Add(account);
         context.SaveChanges();
-        await AccountService.CreateAccount(context, account, Excels, new ParcelHandler(Excels, Mapper));
+        await AccountService.CreateAccount(context, account, Excels, new ParcelHandler(Excels, Mapper, new MissionService(Excels, Mapper)));
 
         return context;
     }
