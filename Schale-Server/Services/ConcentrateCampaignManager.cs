@@ -751,6 +751,7 @@ public class ConcentrateCampaignManager
         if (isStageClear)
         {
             Tick(MissionCompleteConditionType.Achieve_ClearCampaignStageCount);
+            progresses.AddRange(_missionService.TickCampaignStageDifficulty(context, account, stageSaveData.StageUniqueId));
             Tick(MissionCompleteConditionType.Reset_ClearSpecificCampaignStageCount,
                 parameter: stageSaveData.StageUniqueId);
 

@@ -321,6 +321,10 @@ public class ContentSweepHandler : ProtocolHandlerBase
                 totalSweepCount)
             : [];
 
+        // Sweeps count for the "clear N Hard/Normal stages" tasks too.
+        foreach (var parameter in parameters.Where(p => p.SweepCount > 0))
+            missionProgresses.AddRange(_missionService.TickCampaignStageDifficulty(db, account, parameter.StageId, parameter.SweepCount));
+
         if (missionProgresses.Count > 0)
             response.MissionProgressDBs = missionProgresses;
 

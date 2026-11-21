@@ -136,6 +136,16 @@ public class MissionService
         };
     }
 
+    /// <summary>"Clear N Normal/Hard stages" tasks: the difficulty is not on the stage row, the chapter lists which ids are Hard.</summary>
+    public List<MissionProgressDB> TickCampaignStageDifficulty(SchaleDataContext context, AccountDBServer account, long stageId, long count = 1)
+    {
+        var hard = _excelService.GetTable<CampaignChapterExcelT>().Any(c => c.HardCampaignStageId?.Contains(stageId) == true);
+        var normal = !hard && _excelService.GetTable<CampaignChapterExcelT>().Any(c => c.NormalCampaignStageId?.Contains(stageId) == true);
+        if (hard) return UpdateMissionProgress(context, account, MissionCompleteConditionType.Reset_ClearCampaignStageDifficultyHard, count);
+        if (normal) return UpdateMissionProgress(context, account, MissionCompleteConditionType.Reset_ClearCampaignStageDifficultyNormal, count);
+        return [];
+    }
+
     /// <summary>Login-driven tasks: daily login, logins-per-week (once per game day) and "log in between HHMM and HHMM".</summary>
     public List<MissionProgressDB> TickLogin(SchaleDataContext context, AccountDBServer account)
     {

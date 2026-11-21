@@ -165,6 +165,9 @@ public class TimeAttackDungeonHandler : ProtocolHandlerBase
         }
 
         response.MissionProgressDBs = _missions.UpdateMissionProgress(db, account, MissionCompleteConditionType.Reset_ClearTimeAttackDungeonCount, 1);
+        // Season-limited J.F.D. tasks name the season they count for (TimeAttackDungeonSeasonManage id).
+        response.MissionProgressDBs.AddRange(_missions.UpdateMissionProgress(db, account, MissionCompleteConditionType.Reset_ClearSpecificTimeAttackDungeonCount, 1,
+            account.ContentInfo.TimeAttackDungeonDataInfo.SeasonId));
         await db.SaveChangesAsync();
 
         var targetGeas = _timeAttackDungeonManager.GetTADGeas(request.Summary.StageId);
