@@ -10,8 +10,8 @@ namespace Schale_Server.Controllers.SDK
     public class StampController : ControllerBase
     {
         // Opaque handles the client echoes back on later stamp calls (issue/purchase), which an offline server never completes, so stable placeholders suffice.
-        private const string StampId = "schale-stamp-00000000-0000-0000-0000-000000000001";
-        private const string StampToken = "schale-stamp-token";
+        private static string StampId => IdentityPrefix.Value + "-stamp-00000000-0000-0000-0000-000000000001";
+        private static string StampToken => IdentityPrefix.Value + "-stamp-token";
 
         private readonly ILogger<StampController> _logger;
 

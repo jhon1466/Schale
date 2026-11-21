@@ -1,3 +1,4 @@
+using Schale_Server.Controllers.SDK;
 using System.Text;
 using AutoMapper;
 using Microsoft.EntityFrameworkCore;
@@ -225,7 +226,7 @@ public class AccountHandler : ProtocolHandlerBase
     {
         const string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
         var hash = System.Security.Cryptography.SHA256.HashData(
-            Encoding.UTF8.GetBytes($"schale-uid:{publisherAccountId}"));
+            Encoding.UTF8.GetBytes($"{IdentityPrefix.Value}-uid:{publisherAccountId}"));
         var chars = new char[26];
         for (int i = 0; i < chars.Length; i++)
             chars[i] = alphabet[hash[i] % 32];
@@ -658,7 +659,7 @@ public class AccountHandler : ProtocolHandlerBase
     internal static string BuildFriendCode(long accountServerId)
     {
         var hash = System.Security.Cryptography.SHA256.HashData(
-            Encoding.UTF8.GetBytes($"schale-friend:{accountServerId}"));
+            Encoding.UTF8.GetBytes($"{IdentityPrefix.Value}-friend:{accountServerId}"));
         var chars = new char[8];
         for (int i = 0; i < chars.Length; i++)
             chars[i] = (char)('A' + (hash[i] % 26));

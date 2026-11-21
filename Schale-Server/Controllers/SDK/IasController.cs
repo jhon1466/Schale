@@ -204,7 +204,7 @@ namespace Schale_Server.Controllers.SDK
             if (!string.IsNullOrWhiteSpace(payload))
                 logger.LogDebug("[IMS IssueLinkTicket] {Payload}", payload);
 
-            var ticket = $"schale-link-ticket:{Guid.NewGuid():N}";
+            var ticket = $"{IdentityPrefix.Value}-link-ticket:{Guid.NewGuid():N}";
             return Results.Json(new
             {
                 status = "success",
@@ -538,7 +538,7 @@ namespace Schale_Server.Controllers.SDK
 
             var session = FindSession(payload, ReadRequestWebToken(payload))
                 ?? RememberSession(payload, CreateWebToken(), ResolveIdentity(payload, ""));
-            var webTicket = $"schale-web-ticket:{Guid.NewGuid():N}";
+            var webTicket = $"{IdentityPrefix.Value}-web-ticket:{Guid.NewGuid():N}";
 
             logger.LogInformation("[IAS IssueWebTicketByGameToken Response] web_ticket={WebTicket} game_token_present={HasGameToken}",
                 webTicket,
@@ -919,7 +919,7 @@ namespace Schale_Server.Controllers.SDK
 
         private static string TryReadWebTokenPart(string webToken, int index)
         {
-            if (string.IsNullOrWhiteSpace(webToken) || !webToken.StartsWith("schale:", StringComparison.Ordinal))
+            if (string.IsNullOrWhiteSpace(webToken) || !IdentityPrefix.IsServerToken(webToken))
                 return "";
 
             var parts = webToken.Split(':');
@@ -1000,7 +1000,7 @@ namespace Schale_Server.Controllers.SDK
                 // The native gamescale.core.dll C-API GameAuthAccountLinkUpdatePrimaryLink (0x1800cda90) parses this body and REQUIRES the following top-level fields to each be a JSON STRING (nlohmann value_t::string == 3), checked in this order: trace_id, token_type, token, primary_platform_type, primary_platform_user_id, guid.
                 // If any is absent or non-string it logs "<field> is empty", routes if.error.auth.account_link.fetch_primary.invalid_arg, and returns WITHOUT calling sub_1800979A0 (the SetPrimaryLink continuation), which is why the managed layer never advances to Queuing_GetTicket.
                 // token is a FLAT top-level string here, not a nested object.
-                trace_id = $"schale-trace:{Guid.NewGuid():N}",
+                trace_id = $"{IdentityPrefix.Value}-trace:{Guid.NewGuid():N}",
                 token = session.WebToken,
                 token_type = "Bearer",
                 primary_platform_type = primary.PlatformType,
@@ -1025,7 +1025,7 @@ namespace Schale_Server.Controllers.SDK
 
         private static string CreateTicket()
         {
-            return $"schale-ticket:{Guid.NewGuid():N}";
+            return $"{IdentityPrefix.Value}-ticket:{Guid.NewGuid():N}";
         }
 
         private static string CreateGameToken(IasSession session)

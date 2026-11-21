@@ -156,7 +156,7 @@ internal static class GuestDeviceIdentity
 
     private static string Suffix(string seed, ulong range, int digits)
     {
-        var hash = SHA256.HashData(Encoding.UTF8.GetBytes("schale-guest-device:" + seed));
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(IdentityPrefix.Value + "-guest-device:" + seed));
         var number = BinaryPrimitives.ReadUInt64LittleEndian(hash) % range;
         return number.ToString($"D{digits}", CultureInfo.InvariantCulture);
     }
@@ -169,5 +169,5 @@ internal static class GuestDeviceIdentity
     }
 
     public static string DeviceKey(string seed)
-        => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("schale-device-key:" + seed))).ToLowerInvariant();
+        => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(IdentityPrefix.Value + "-device-key:" + seed))).ToLowerInvariant();
 }
