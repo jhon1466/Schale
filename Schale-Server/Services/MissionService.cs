@@ -34,6 +34,9 @@ public class MissionService
         var relevantMissions = missionExcels
             .Where(m => m.CompleteConditionType == conditionType)
             .Where(m => m.Category == MissionCategory.Daily ||
+                       // the day's sudden task ("Purchase an item at a shop") and the fixed "complete N dailies" bonus live in their own categories
+                       m.Category == MissionCategory.DailySudden ||
+                       m.Category == MissionCategory.DailyFixed ||
                        m.Category == MissionCategory.Weekly ||
                        m.Category == MissionCategory.Achievement ||
                        // Challenge is the per-stage "clear it in N turns" mission. Official sends these in MissionProgressDBs like any other (30150 on the campaign clear), and Mission_List serves them from the same storage. Every Reset_CompleteCampaignStageMinimumTurn row is Challenge.
