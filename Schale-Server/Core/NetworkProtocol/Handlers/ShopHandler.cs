@@ -598,6 +598,12 @@ public class ShopHandler : ProtocolHandlerBase
             // No Price - official omits it (see ShopManager.GetShopList).
         };
 
+        // Daily "Purchase an item at a shop" - the plain shop never reported it, only the refresh shop did.
+        var shopMissions = _missionService.UpdateMissionProgress(db, account, MissionCompleteConditionType.Reset_BuyShopGoods, 1);
+        shopMissions.AddRange(_missionService.UpdateMissionProgress(db, account, MissionCompleteConditionType.Reset_ShopBuyCount, 1));
+        if (shopMissions.Count > 0)
+            response.MissionProgressDBs = shopMissions;
+
         await db.SaveChangesAsync();
 
         return response;
@@ -919,6 +925,9 @@ public class ShopHandler : ProtocolHandlerBase
             db, account, MissionCompleteConditionType.Reset_ShopBuyActionPointCount, request.PurchaseCount);
         if (buyApMissions.Count > 0)
             response.MissionProgressDBs = buyApMissions;
+
+        // The mission row is added after the purchase was saved above; without this it never reaches the database.
+        await db.SaveChangesAsync();
 
         return response;
     }

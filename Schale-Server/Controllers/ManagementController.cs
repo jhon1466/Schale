@@ -474,6 +474,25 @@ public class ManagementController : ControllerBase
         return Ok(new { success = true });
     }
 
+    // Mission catalogue with its completion condition - lets GM tooling see which condition each task waits for.
+    [HttpGet("static/missions")]
+    public IActionResult StaticMissions([FromQuery] string? category = null)
+    {
+        var rows = _excel.GetTable<MissionExcelT>()
+            .Where(m => string.IsNullOrEmpty(category) || m.Category.ToString().Equals(category, StringComparison.OrdinalIgnoreCase))
+            .Select(m => new
+            {
+                m.Id,
+                category = m.Category.ToString(),
+                reset = m.ResetType.ToString(),
+                condition = m.CompleteConditionType.ToString(),
+                count = m.CompleteConditionCount,
+                parameters = m.CompleteConditionParameter,
+                m.Description,
+            });
+        return Ok(rows);
+    }
+
     [HttpGet("account/{serverId:long}/mails")]
     public async Task<IActionResult> AccountMails(long serverId)
     {
