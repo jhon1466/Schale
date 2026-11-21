@@ -27,6 +27,7 @@ namespace Schale.Managers
             services.AddSingleton<WorldRaidManager>();
             services.AddSingleton<EventContentCampaignManager>();
             services.AddSingleton<MissionService>();
+            services.AddSingleton<MissionStateEvaluator>();
             services.AddSingleton<AttendanceService>();
             services.AddSingleton<EventContentCollectionService>();
             services.AddSingleton<MiniGameMissionService>();

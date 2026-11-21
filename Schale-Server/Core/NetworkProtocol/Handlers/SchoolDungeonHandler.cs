@@ -74,7 +74,9 @@ public class SchoolDungeonHandler : ProtocolHandlerBase
         response.SchoolDungeonStageHistoryDB = historyDb.ToMap(_mapper);
         if (request.Summary?.EndType == BattleEndType.Clear)
         {
+            _missions.TickKills(db, account, request.Summary);
             response.MissionProgressDBs = _missions.UpdateMissionProgress(db, account, MissionCompleteConditionType.Achieve_ClearSchoolDungeonCount, 1);
+            response.MissionProgressDBs.AddRange(_missions.UpdateMissionProgress(db, account, MissionCompleteConditionType.Reset_ClearGeneralSchoolDungeonCount, 1));
             await db.SaveChangesAsync();
         }
         response.LevelUpCharacterDBs = new();

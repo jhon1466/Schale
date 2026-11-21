@@ -96,7 +96,7 @@ public class ClaimAllTests
 
     private static MissionHandler Handler() => new(
         null!, new FixedSessionService(), Mapper, Excels,
-        new ParcelHandler(Excels, Mapper, new MissionService(Excels, Mapper)), new MissionService(Excels, Mapper));
+        new ParcelHandler(Excels, Mapper, new MissionService(Excels, Mapper)), new MissionService(Excels, Mapper), new MissionStateEvaluator(Excels));
 
     private static SessionKey Key(AccountDBServer account) => new() { AccountServerId = account.ServerId, MxToken = "t" };
 

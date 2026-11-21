@@ -233,6 +233,7 @@ public class ArenaHandler : ProtocolHandlerBase
 
         // A tactical challenge entered: "join arena" and "use an arena ticket" (currency 7) tasks.
         response.MissionProgressDBs = _missions.UpdateMissionProgress(db, account, MissionCompleteConditionType.Achieve_JoinArenaCount, 1);
+        response.MissionProgressDBs.AddRange(_missions.UpdateMissionProgress(db, account, MissionCompleteConditionType.Reset_JoinArenaCount, 1));
         response.MissionProgressDBs.AddRange(_missions.UpdateMissionProgress(db, account, MissionCompleteConditionType.Reset_UseTiket, ticketCost, (long)CurrencyTypes.ArenaTicket));
         await db.SaveChangesAsync();
 

@@ -183,11 +183,25 @@ public class ParcelHandler
             var apSpent = -filteredParcels
                 .Where(p => p.Type == ParcelType.Currency && p.Id == (long)CurrencyTypes.ActionPoint && p.Amount < 0)
                 .Sum(p => p.Amount);
+            var goldSpent = -filteredParcels
+                .Where(p => p.Type == ParcelType.Currency && p.Id == (long)CurrencyTypes.Gold && p.Amount < 0)
+                .Sum(p => p.Amount);
+            var touched = false;
             if (apSpent > 0)
             {
                 _missionService.UpdateMissionProgress(context, account, MissionCompleteConditionType.Reset_UseActionPoint, apSpent);
-                await context.SaveChangesAsync();
+                touched = true;
             }
+            if (goldSpent > 0)
+            {
+                _missionService.UpdateMissionProgress(context, account, MissionCompleteConditionType.Achieve_UseGold, goldSpent);
+                touched = true;
+            }
+            // Daily sudden "obtain N items / equipment with tag X"
+            if (!isConsume)
+                touched |= _missionService.TickObtainedWithTags(context, account, filteredParcels) > 0;
+            if (touched)
+                await context.SaveChangesAsync();
 
             if (!isConsume)
             {

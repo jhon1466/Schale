@@ -82,7 +82,12 @@ public class WeekDungeonHandler : ProtocolHandlerBase
             var condition = type is WeekDungeonType.FindGift or WeekDungeonType.Blood
                 ? MissionCompleteConditionType.Achieve_ClearFindGiftAndBloodDungeonCount
                 : MissionCompleteConditionType.Achieve_ClearChaserDungeonCount;
+            _missions.TickKills(db, account, request.Summary);
             response.MissionProgressDBs = _missions.UpdateMissionProgress(db, account, condition, 1);
+            response.MissionProgressDBs.AddRange(_missions.UpdateMissionProgress(db, account,
+                condition == MissionCompleteConditionType.Achieve_ClearChaserDungeonCount
+                    ? MissionCompleteConditionType.Reset_ClearGeneralChaserDungeonCount
+                    : MissionCompleteConditionType.Reset_ClearGeneralFindGiftAndBloodDungeonCount, 1));
             await db.SaveChangesAsync();
         }
         response.LevelUpCharacterDBs = new();

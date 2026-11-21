@@ -146,6 +146,77 @@ public class MissionService
         return [];
     }
 
+    /// <summary>Tag-filtered "obtain" tasks: an obtained item/equipment counts for a mission when it carries one of the mission's tags.</summary>
+    public int TickObtainedWithTags(SchaleDataContext context, AccountDBServer account, IEnumerable<ParcelResult> parcels)
+    {
+        var missions = _excelService.GetTable<MissionExcelT>()
+            .Where(m => m.CompleteConditionType is MissionCompleteConditionType.Reset_GetItemWithTagCount or MissionCompleteConditionType.Reset_GetEquipmentWithTagCount)
+            .ToList();
+        if (missions.Count == 0) return 0;
+        var itemTags = _excelService.GetTable<ItemExcelT>().GroupBy(x => x.Id).ToDictionary(g => g.Key, g => g.First().Tags ?? []);
+        var equipTags = _excelService.GetTable<EquipmentExcelT>().GroupBy(x => x.Id).ToDictionary(g => g.Key, g => g.First().Tags ?? []);
+        var ticked = 0;
+        foreach (var parcel in parcels.Where(p => p.Amount > 0))
+        {
+            List<Tag>? tags = null;
+            var condition = MissionCompleteConditionType.None;
+            if (parcel.Type == ParcelType.Item) { condition = MissionCompleteConditionType.Reset_GetItemWithTagCount; tags = itemTags.GetValueOrDefault(parcel.Id); }
+            else if (parcel.Type == ParcelType.Equipment) { condition = MissionCompleteConditionType.Reset_GetEquipmentWithTagCount; tags = equipTags.GetValueOrDefault(parcel.Id); }
+            if (tags == null || tags.Count == 0) continue;
+            foreach (var mission in missions.Where(m => m.CompleteConditionType == condition && (m.CompleteConditionParameterTag ?? []).Intersect(tags).Any()))
+                ticked += TickOne(context, account, mission, parcel.Amount);
+        }
+        return ticked;
+    }
+
+    /// <summary>Tag-filtered "defeat N enemies with tag X": called with the tags of every enemy killed in a battle.</summary>
+    public int TickKilledWithTags(SchaleDataContext context, AccountDBServer account, IEnumerable<IReadOnlyCollection<Tag>> killedEnemyTags)
+    {
+        var missions = _excelService.GetTable<MissionExcelT>()
+            .Where(m => m.CompleteConditionType == MissionCompleteConditionType.Reset_KillEnemyWithTagCount).ToList();
+        var ticked = 0;
+        foreach (var tags in killedEnemyTags)
+            foreach (var mission in missions.Where(m => (m.CompleteConditionParameterTag ?? []).Intersect(tags).Any()))
+                ticked += TickOne(context, account, mission, 1);
+        return ticked;
+    }
+
+    /// <summary>Feeds the enemies a battle killed (the Group02 side of the summary) to the tag-filtered kill tasks.</summary>
+    public int TickKills(SchaleDataContext context, AccountDBServer account, Schale.MX.Logic.Battles.Summary.BattleSummary? summary)
+    {
+        var enemies = summary?.Group02Summary?.Heroes;
+        if (enemies == null || enemies.Count == 0) return 0;
+        var tagsById = _excelService.GetTable<CharacterExcelT>().GroupBy(c => c.Id).ToDictionary(g => g.Key, g => (IReadOnlyCollection<Tag>)(g.First().Tags ?? []));
+        var killed = enemies.Where(e => e.IsDead || e.DeadFrame > 0)
+            .Select(e => tagsById.GetValueOrDefault(e.CharacterId))
+            .Where(t => t is { Count: > 0 })
+            .Select(t => t!);
+        return TickKilledWithTags(context, account, killed);
+    }
+
+    private int TickOne(SchaleDataContext context, AccountDBServer account, MissionExcelT mission, long amount)
+    {
+        var now = account.GameSettings.ServerDateTime();
+        var row = context.MissionProgresses.Local.FirstOrDefault(m => m.AccountServerId == account.ServerId && m.MissionUniqueId == mission.Id)
+            ?? context.MissionProgresses.FirstOrDefault(m => m.AccountServerId == account.ServerId && m.MissionUniqueId == mission.Id);
+        if (row != null && IsStale(mission.ResetType, row.StartTime, now))
+        {
+            row.StartTime = now;
+            row.ProgressParameters = new Dictionary<long, long>();
+            row.Complete = false;
+        }
+        if (row is { Complete: true }) return 0;
+        if (row == null)
+        {
+            row = new MissionProgressDBServer { AccountServerId = account.ServerId, MissionUniqueId = mission.Id, StartTime = now, ProgressParameters = new Dictionary<long, long>(), Complete = false };
+            context.MissionProgresses.Add(row);
+        }
+        var value = (row.ProgressParameters?.GetValueOrDefault(0) ?? 0) + amount;
+        row.ProgressParameters = new Dictionary<long, long>(row.ProgressParameters ?? new Dictionary<long, long>()) { [0] = value };
+        row.Complete = value >= mission.CompleteConditionCount;
+        return 1;
+    }
+
     /// <summary>Login-driven tasks: daily login, logins-per-week (once per game day) and "log in between HHMM and HHMM".</summary>
     public List<MissionProgressDB> TickLogin(SchaleDataContext context, AccountDBServer account)
     {
@@ -159,7 +230,10 @@ public class MissionService
 
         var result = UpdateMissionProgress(context, account, MissionCompleteConditionType.Reset_DailyLogin, 1);
         if (!alreadyToday)
+        {
             result.AddRange(UpdateMissionProgress(context, account, MissionCompleteConditionType.Reset_DailyLoginCount, 1));
+            result.AddRange(UpdateMissionProgress(context, account, MissionCompleteConditionType.Achieve_TotalLoginCount, 1));
+        }
 
         // Parameters are a [from, to] window as HHMM on a 04:00-based day (2800 = 04:00 next morning).
         var hhmm = now.Hour * 100 + now.Minute;

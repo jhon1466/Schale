@@ -629,6 +629,7 @@ public class ConcentrateCampaignManager
             clearReward.CampaignStageHistoryDB = historyMap;
 
         // missions tick off the tactic, not the stage: official sends MissionProgressDBs on every Campaign_TacticResult, including the three that did not finish the stage
+        _missionService.TickKills(context, account, req.Summary);
         var missionProgresses = await TickTacticMissions(
             context, account, stageSaveData, tacticWon, isStageClear,
             StarCount(historyDb) - starsBefore);

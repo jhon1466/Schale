@@ -22,14 +22,18 @@ public class MissionHandler : ProtocolHandlerBase
     private readonly ParcelHandler _parcelHandler;
     private readonly MissionService _missionService;
 
+    private readonly MissionStateEvaluator _stateEvaluator;
+
     public MissionHandler(
         IProtocolHandlerRegistry registry,
         ISessionKeyService sessionService,
         IMapper mapper,
         ExcelTableService excelService,
         ParcelHandler parcelHandler,
-        MissionService missionService) : base(registry)
+        MissionService missionService,
+        MissionStateEvaluator stateEvaluator) : base(registry)
     {
+        _stateEvaluator = stateEvaluator;
         _sessionService = sessionService;
         _mapper = mapper;
         _excelService = excelService;
@@ -45,6 +49,8 @@ public class MissionHandler : ProtocolHandlerBase
     {
         var account = await _sessionService.GetAuthenticatedUser(db, request.SessionKey);
 
+        _stateEvaluator.Sync(db, account);
+        await db.SaveChangesAsync();
         var missionProgresses = db.GetAccountMissionProgresses(account.ServerId).ToList();
 
         response.MissionProgressDBs = _mapper.Map<List<MissionProgressDB>>(
@@ -84,6 +90,8 @@ public class MissionHandler : ProtocolHandlerBase
 
         if (request.EventContentId == null)
         {
+            _stateEvaluator.Sync(db, account);
+            await db.SaveChangesAsync();
             // Official's account-wide ProgressDBs holds mission + guide-mission rows only. Battle-pass rows (shared MissionProgresses storage, served by BattlePass_MissionList) and event rows never appear here.
             var missionProgresses = db.GetAccountMissionProgresses(account.ServerId).ToList();
             response.ProgressDBs = _mapper.Map<List<MissionProgressDB>>(
