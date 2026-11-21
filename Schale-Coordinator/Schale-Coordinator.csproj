@@ -1,9 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
-
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <RootNamespace>Schale_Coordinator</RootNamespace>
-  </PropertyGroup>
-
-</Project>

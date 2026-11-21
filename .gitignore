@@ -141,3 +141,12 @@ SchaleRaidConsole/dist/
 # *.key, *.crt and other rules above (Git uses last-match-wins).
 !/Schale-Server/config/
 !/Schale-Server/config/**
+
+# Local research tools (kept locally, not published)
+/Tools/
+/MemoryDumper/
+/Schale-Coordinator/
+/SchaleRaidConsole/
+/autorun.ps1
+/package.json
+/package-lock.json
