@@ -101,6 +101,7 @@ namespace Schale_Server.Services
             // ShopRecruitExcel has drifted - the client inserted two fields mid-table since the models were generated - so a straight UnPack walks a later field's offset into the middle of another one and throws.
             var slots = ClientExcelSchema.RowSlots(typeof(ShopRecruitExcelT), "ShopRecruitExcel");
             var artSlot = slots[Array.FindIndex(typeof(ShopRecruitExcelT).GetProperties(), p => p.Name == nameof(ShopRecruitExcelT.GachaBannerPath))];
+            var endSlot = slots[Array.FindIndex(typeof(ShopRecruitExcelT).GetProperties(), p => p.Name == nameof(ShopRecruitExcelT.SalePeriodTo))];
 
             var rows = new List<BannerRow>();
             using (var cmd = conn.CreateCommand())
@@ -124,9 +125,14 @@ namespace Schale_Server.Services
             }
 
             var now = DateTime.Now;
+            // Rows that ship without art. Read from the pristine dump too, because older builds of this service already filled
+            // these rows in the client copy with a sibling's art - which made several different recruitments share one image.
+            var originallyEmpty = rows.Where(r => string.IsNullOrEmpty(r.Art)).Select(r => r.Id).ToHashSet();
+            originallyEmpty.UnionWith(PristineEmptyArtIds(dbPath, slots, logger));
+
             // Only touch banners that can still be displayed (no end date / future / unparseable), so we don't rewrite hundreds of expired historical rows.
             var targets = rows
-                .Where(r => string.IsNullOrEmpty(r.Art))
+                .Where(r => originallyEmpty.Contains(r.Id))
                 .Where(r => !IsExpired(r.SalePeriodTo, now))
                 .ToList();
 
@@ -141,10 +147,18 @@ namespace Schale_Server.Services
             {
                 foreach (var target in targets)
                 {
-                    var art = PickRelatedArt(target.Id, withArt);
-                    var newBytes = RealignedRowReader.WithString(target.Bytes, artSlot, art);
+                    // Hide it: the client lists recruitments by sale period, so an end date in the past drops the row from
+                    // "View All Recruitments" instead of drawing it with someone else's banner art.
+                    var newBytes = RealignedRowReader.WithString(target.Bytes, endSlot, HiddenSaleEnd);
+                    var art = "(hidden)";
                     if (newBytes == null)
-                        continue;
+                    {
+                        // No end-date field to point at (undated row): keep the old behaviour so it is at least not blank.
+                        if (!string.IsNullOrEmpty(target.Art)) continue;
+                        art = PickRelatedArt(target.Id, withArt);
+                        newBytes = RealignedRowReader.WithString(target.Bytes, artSlot, art);
+                        if (newBytes == null) continue;
+                    }
 
                     using var upd = conn.CreateCommand();
                     upd.Transaction = tx;
@@ -154,12 +168,42 @@ namespace Schale_Server.Services
                     upd.ExecuteNonQuery();
                     patched++;
 
-                    logger?.LogInformation("Banner {Id}: empty art -> {Art}", target.Id, art);
+                    logger?.LogInformation("Banner {Id}: no own art -> {Art}", target.Id, art);
                 }
                 tx.Commit();
             }
 
             logger?.LogInformation("Patched {Count} empty recruitment banner art path(s) in client ExcelDB", patched);
+        }
+
+        private const string HiddenSaleEnd = "2000-01-01 00:00:00";
+
+        private static IEnumerable<long> PristineEmptyArtIds(string dbPath, int[] slots, ILogger? logger)
+        {
+            var pristine = Path.Combine(ResourceService.DumpedDir, "ExcelDB.db");
+            if (!File.Exists(pristine) || string.Equals(Path.GetFullPath(pristine), Path.GetFullPath(dbPath), StringComparison.OrdinalIgnoreCase))
+                return [];
+            try
+            {
+                using var conn = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = pristine, Mode = SqliteOpenMode.ReadOnly }.ToString());
+                conn.Open();
+                ApplyKey(conn);
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = $"SELECT Bytes FROM [{SchemaTable}]";
+                using var reader = cmd.ExecuteReader();
+                var ids = new List<long>();
+                while (reader.Read())
+                {
+                    var rec = (ShopRecruitExcelT)RealignedRowReader.Read((byte[])reader[0], typeof(ShopRecruitExcelT), slots);
+                    if (string.IsNullOrEmpty(rec.GachaBannerPath)) ids.Add(rec.Id);
+                }
+                return ids;
+            }
+            catch (Exception ex)
+            {
+                logger?.LogWarning(ex, "Could not read the pristine ExcelDB to find art-less banners");
+                return [];
+            }
         }
 
         // Reuse the art of the banner whose Id shares the longest leading-digit run -> same event/family, so the blank slot shows that event's real banner image.
