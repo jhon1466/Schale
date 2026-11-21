@@ -1,3 +1,5 @@
+using Microsoft.Extensions.DependencyInjection;
+using Schale_Server.Services;
 using Microsoft.EntityFrameworkCore;
 using Schale.Data;
 using Schale.MX.NetworkProtocol;
@@ -121,6 +123,14 @@ public class ProtocolHandlerRegistry : IProtocolHandlerRegistry
         return type;
     }
 
+    private static HashSet<long>? _missionScreenIds;
+
+    // Ids the client's mission screen can resolve (MissionExcel + GuideMissionExcel); battle-pass and event rows share the table but must not ride along.
+    private static HashSet<long> MissionScreenIds(BlueArchiveAPI.Services.ExcelTableService excel)
+        => _missionScreenIds ??= excel.GetTable<Schale.FlatData.MissionExcelT>().Select(x => x.Id)
+            .Concat(excel.GetTable<Schale.FlatData.GuideMissionExcelT>().Select(x => x.Id))
+            .ToHashSet();
+
     public async Task<ResponsePacket?> InvokeHandler(Protocol protocol, RequestPacket request)
     {
         var method = GetHandler(protocol);
@@ -159,19 +169,26 @@ public class ProtocolHandlerRegistry : IProtocolHandlerRegistry
         {
             var result = method.Invoke(instance, new object[] { context, request, response });
 
+            var final = response;
             if (result is Task task)
             {
                 await task;
                 var resultProp = task.GetType().GetProperty("Result");
                 if (resultProp?.GetValue(task) is ResponsePacket taskResult)
-                    return taskResult;
+                    final = taskResult;
             }
             else if (result is ResponsePacket directResult)
             {
-                return directResult;
+                final = directResult;
             }
 
-            return response;
+            // Missions moved by this action ride on its response, so the client plays the "task complete" toast.
+            var mapper = scope.ServiceProvider.GetService<AutoMapper.IMapper>();
+            var excel = scope.ServiceProvider.GetService<BlueArchiveAPI.Services.ExcelTableService>();
+            if (mapper != null && excel != null && protocol is not (Protocol.Mission_List or Protocol.Mission_Sync))
+                MissionChangeLog.AttachTo(context, final, mapper, MissionScreenIds(excel));
+
+            return final;
         }
         catch (Exception ex)
         {

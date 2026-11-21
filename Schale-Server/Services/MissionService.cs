@@ -114,6 +114,7 @@ public class MissionService
                 existingMission.Complete = existingMission.ProgressParameters[key] >= mission.CompleteConditionCount;
             }
 
+            MissionChangeLog.Record(context, existingMission);
             if (!mission.IsBattlePass)
                 updatedMissions.Add(existingMission.ToMap(_mapper));
         }
@@ -217,6 +218,7 @@ public class MissionService
         var value = (row.ProgressParameters?.GetValueOrDefault(0) ?? 0) + amount;
         row.ProgressParameters = new Dictionary<long, long>(row.ProgressParameters ?? new Dictionary<long, long>()) { [0] = value };
         row.Complete = value >= mission.CompleteConditionCount;
+        MissionChangeLog.Record(context, row);
         return 1;
     }
 
