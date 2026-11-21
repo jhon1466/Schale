@@ -40,6 +40,9 @@ namespace BlueArchiveAPI.Configuration
                     .MinimumLevel.Information()
                     .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
                     .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Warning)
+                    // AutoMapper's licence notice (dev/testing use is allowed) is not a problem worth a warning on every start
+                    .MinimumLevel.Override("LuckyPennySoftware", LogEventLevel.Error)
+                    .MinimumLevel.Override("AutoMapper", LogEventLevel.Error)
                     .WriteTo.Console(restrictedToMinimumLevel: LogEventLevel.Information)
                     .WriteTo.File(
                         logFilePath,

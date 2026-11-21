@@ -36,7 +36,7 @@ namespace Schale_Server.Services
             {
                 if (string.IsNullOrWhiteSpace(configPath))
                 {
-                    logger.LogWarning("Client inface config auto-patch is enabled, but no nxinface config path was configured. " +
+                    logger.LogDebug("Client inface config auto-patch is enabled, but no nxinface config path was configured. " +
                         "Set ClientInfaceConfigPath in server config or set SCHALE_CLIENT_INFACE_CONFIG_PATH env var.");
                     return Task.CompletedTask;
                 }

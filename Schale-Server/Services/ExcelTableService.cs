@@ -87,6 +87,7 @@ namespace BlueArchiveAPI.Services
                         command.CommandText = $"SELECT Bytes FROM [{schemaName}]";
 
                         var skippedRows = 0;
+                        string? firstRowError = null;
                         var widestRow = 0;
                         var properties = type.GetProperties();
                         var slotMap = ClientExcelSchema.SlotMapFor(type, baseTypeName);
@@ -121,7 +122,7 @@ namespace BlueArchiveAPI.Services
                                 {
                                     // Skip just the bad row - a row whose bytes don't line up with the current FlatBuffer schema otherwise reaches the catch below and discards the ENTIRE table, silently turning every lookup against it into "not found".
                                     if (skippedRows++ == 0)
-                                        Console.WriteLine($"[ExcelTableService] WARNING: {baseTypeName} has rows that do not match the current schema ({rowEx.GetBaseException().Message}); skipping them");
+                                        firstRowError = rowEx.GetBaseException().Message;
                                 }
                             }
                         }
@@ -143,8 +144,8 @@ namespace BlueArchiveAPI.Services
 
                             if (realigned.Count >= excelList.Count)
                             {
-                                Console.WriteLine($"[ExcelTableService] {baseTypeName}: layout drift detected; realigned {realigned.Count} row(s) against the installed client's schema" +
-                                    (unreadable > 0 ? $" ({unreadable} still unreadable)" : "") + ". Regenerate the model to make this permanent.");
+                                if (unreadable > 0)
+                                    Console.WriteLine($"[ExcelTableService] WARNING: {baseTypeName}: {unreadable} row(s) still unreadable after realigning to the client's schema.");
                                 if (unreadable > 0)
                                     incomplete[type] = 0;
                                 return realigned;
@@ -155,7 +156,7 @@ namespace BlueArchiveAPI.Services
                         if (skippedRows > 0)
                         {
                             incomplete[type] = 0;
-                            Console.WriteLine($"[ExcelTableService] WARNING: {baseTypeName}: skipped {skippedRows} unreadable row(s), loaded {excelList.Count}");
+                            Console.WriteLine($"[ExcelTableService] WARNING: {baseTypeName}: skipped {skippedRows} unreadable row(s), loaded {excelList.Count} ({firstRowError})");
                         }
                     }
 

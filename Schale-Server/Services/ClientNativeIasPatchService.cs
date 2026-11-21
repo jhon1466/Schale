@@ -325,7 +325,7 @@ namespace Schale_Server.Services
             {
                 var results = ResolveStringPatch(module, data, existingState, definition, target);
                 if (results.Count == 0)
-                    logger.LogWarning("{ModuleName} IAS patch target was not found: {PatchName}", module.DisplayName, definition.Name);
+                    logger.LogDebug("{ModuleName} IAS patch target not present in this client build: {PatchName}", module.DisplayName, definition.Name);
 
                 activePatches.AddRange(results);
             }
@@ -591,6 +591,11 @@ namespace Schale_Server.Services
                 index++;
             }
 
+            if (results.Count == 0)
+            {
+                logger.LogDebug("{ModuleName} IAS scheme builder not present in this client build - skipped", module.DisplayName);
+                return [];
+            }
             if (results.Count != module.SchemeBuilderMatches)
             {
                 logger.LogError("{ModuleName} IAS https/http scheme builder matched {MatchCount} constants, expected {Expected} - skipping it. The module is a build these offsets were not measured against.",
@@ -655,6 +660,11 @@ namespace Schale_Server.Services
             }
 
             // A byte signature that hits a different number of sites than it was written against is not the code we studied, so there is nothing to say about which of the matches is the right one. Refusing the whole definition costs a broken IAS route; guessing costs a corrupted DLL the user has to verify through Steam.
+            if (results.Count == 0)
+            {
+                logger.LogDebug("{ModuleName} IAS binary patch {PatchName} not present in this client build - skipped", module.DisplayName, definition.Name);
+                return [];
+            }
             if (results.Count != definition.ExpectedMatches)
             {
                 logger.LogError("{ModuleName} IAS binary patch {PatchName} matched {MatchCount} locations, expected {Expected} - skipping it. The module is a build this signature was not written for.",

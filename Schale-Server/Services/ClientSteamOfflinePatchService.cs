@@ -285,7 +285,7 @@ namespace Schale_Server.Services
             }
 
             if (last is not null)
-                logger.LogWarning("Steam offline patch signature {PatchName} did not match any known build variant", last.Name);
+                logger.LogDebug("Steam offline patch signature {PatchName} did not match any known build variant", last.Name);
 
             return null;
         }
