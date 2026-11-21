@@ -17,8 +17,21 @@
 ![Android](https://img.shields.io/badge/Android-client-3DDC84?style=for-the-badge&logo=android&logoColor=white)
 
 <a href="https://github.com/jhon1466/Schale/releases/latest"><img src="https://img.shields.io/badge/%E4%B8%8B%E8%BD%BD%E6%9C%80%E6%96%B0%E7%89%88%E6%9C%AC-128afa?style=for-the-badge&logo=github&logoColor=white" alt="下载最新版本" /></a>
+<a href="https://discord.gg/sfPVdxpv98"><img src="https://img.shields.io/badge/%E5%8A%A0%E5%85%A5%20Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord" /></a>
 
 [Español](README.md) · [English](README.en.md) · **中文** · [日本語](README.ja.md)
+
+</div>
+
+---
+
+## 💬 社区
+
+<div align="center">
+
+<a href="https://discord.gg/sfPVdxpv98"><img src="https://img.shields.io/badge/Discord-%E5%8A%A0%E5%85%A5%20Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white&labelColor=404EED" alt="Discord" height="40" /></a>
+
+有疑问、发现问题或有建议？欢迎加入 **Discord 服务器**：这里会发布更新公告、反馈问题，并提供安装帮助。
 
 </div>
 
