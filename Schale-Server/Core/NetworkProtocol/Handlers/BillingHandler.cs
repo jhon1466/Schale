@@ -1,3 +1,4 @@
+using Schale.Data.GameModel;
 using BlueArchiveAPI.Services;
 using Schale.Data;
 using Schale.MX.GameLogic.DBModel;
@@ -35,7 +36,7 @@ public class BillingHandler : ProtocolHandlerBase
     {
         var account = await _sessionService.GetAuthenticatedUser(db, request.SessionKey);
 
-        response.CountList = [];
+        response.CountList = CurrentCashPurchases(db, account);
         response.OrderList = [];
         response.MonthlyProductList = [];
         response.BlockedProductDBs = [];
@@ -239,6 +240,29 @@ public class BillingHandler : ProtocolHandlerBase
             return response;
         }
 
+        // Free cash-shop products (the "Free Daily Pack") are limited per day/week/month; the count was never stored,
+        // so every server restart offered the pack again. Kept in ShopPurchaseHistories under the negated ShopCashId.
+        var now = account.GameSettings.ServerDateTime();
+        var periodStart = ShopManager.PeriodStart(ToResetType(product.PurchasePeriodType), now);
+        var history = db.ShopPurchaseHistories.FirstOrDefault(x => x.AccountServerId == account.ServerId && x.ShopUniqueId == -request.ShopCashId);
+        if (history != null && history.PeriodStart != periodStart)
+        {
+            history.PeriodStart = periodStart;
+            history.PurchaseCount = 0;
+        }
+        if (product.PurchasePeriodLimit > 0 && history != null && history.PurchaseCount >= product.PurchasePeriodLimit)
+        {
+            response.PurchaseProduct = ToCountDB(history, product, now);
+            response.ParcelResult = new();
+            return response;
+        }
+        if (history == null)
+        {
+            history = new ShopPurchaseHistoryDBServer { AccountServerId = account.ServerId, ShopUniqueId = -request.ShopCashId, PeriodStart = periodStart };
+            db.ShopPurchaseHistories.Add(history);
+        }
+        history.PurchaseCount++;
+
         var parcelTypes = product.ParcelType ?? [];
         var parcelIds = product.ParcelId ?? [];
         var parcelAmounts = product.ParcelAmount ?? [];
@@ -257,16 +281,53 @@ public class BillingHandler : ProtocolHandlerBase
         var parcelResult = await _parcelHandler.BuildParcel(db, account, parcels, parcelResultDB);
 
         response.ParcelResult = parcelResultDB;
-        response.PurchaseProduct = new PurchaseCountDB
-        {
-            ShopCashId = request.ShopCashId,
-            PurchaseCount = 1,
-            ResetDate = DateTime.MinValue,
-            PurchaseDate = account.GameSettings.ServerDateTime(),
-            ManualResetDate = null
-        };
+        await db.SaveChangesAsync();
+        response.PurchaseProduct = ToCountDB(history, product, now);
 
         return response;
+    }
+
+    private static PurchaseCountResetType ToResetType(PurchasePeriodType period) => period switch
+    {
+        PurchasePeriodType.Day => PurchaseCountResetType.Day,
+        PurchasePeriodType.Week => PurchaseCountResetType.Week,
+        PurchasePeriodType.Month => PurchaseCountResetType.Month,
+        _ => PurchaseCountResetType.None,
+    };
+
+    // ResetDate is when the count clears (04:00 of the next game day / Monday / 1st); MinValue for never-resetting products.
+    private static DateTime NextReset(PurchasePeriodType period, DateTime periodStart) => period switch
+    {
+        PurchasePeriodType.Day => periodStart.AddDays(1).AddHours(4),
+        PurchasePeriodType.Week => periodStart.AddDays(7).AddHours(4),
+        PurchasePeriodType.Month => periodStart.AddMonths(1).AddHours(4),
+        _ => DateTime.MinValue,
+    };
+
+    private static PurchaseCountDB ToCountDB(ShopPurchaseHistoryDBServer history, ProductExcelT product, DateTime now) => new()
+    {
+        ShopCashId = -history.ShopUniqueId,
+        PurchaseCount = (int)history.PurchaseCount,
+        ResetDate = NextReset(product.PurchasePeriodType, history.PeriodStart),
+        PurchaseDate = now,
+        ManualResetDate = null
+    };
+
+    private List<PurchaseCountDB> CurrentCashPurchases(SchaleDataContext db, AccountDBServer account)
+    {
+        var now = account.GameSettings.ServerDateTime();
+        var shopCash = _excelTableService.GetTable<ShopCashExcelT>().GroupBy(x => x.Id).ToDictionary(g => g.Key, g => g.First());
+        var products = _excelTableService.GetTable<ProductExcelT>().GroupBy(x => x.Id).ToDictionary(g => g.Key, g => g.First());
+        var result = new List<PurchaseCountDB>();
+        foreach (var h in db.ShopPurchaseHistories.Where(x => x.AccountServerId == account.ServerId && x.ShopUniqueId < 0).ToList())
+        {
+            if (!shopCash.TryGetValue(-h.ShopUniqueId, out var cash) || !products.TryGetValue(cash.CashProductId, out var product))
+                continue;
+            if (h.PeriodStart != ShopManager.PeriodStart(ToResetType(product.PurchasePeriodType), now) || h.PurchaseCount <= 0)
+                continue;
+            result.Add(ToCountDB(h, product, now));
+        }
+        return result;
     }
 
     [ProtocolHandler(Protocol.Billing_CheckConditionCashShopGoods)]
