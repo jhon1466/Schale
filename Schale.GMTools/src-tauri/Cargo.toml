@@ -1,0 +1,26 @@
+[package]
+name = "schale-gm-tools"
+version = "1.1.0"
+description = "Schale GM Tools & Auto-Updater"
+authors = ["jhon1466"]
+edition = "2021"
+
+[lib]
+name = "schale_gm_tools_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+ureq = { version = "2", features = ["json"] }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true

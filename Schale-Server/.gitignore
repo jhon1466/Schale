@@ -1,0 +1,6 @@
+Data/*.db
+Data/*.sqlite
+Data/*.sqlite3
+schale.sqlite3
+schale.sqlite3-shm
+schale.sqlite3-wal
