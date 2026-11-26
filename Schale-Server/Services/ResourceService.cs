@@ -68,9 +68,10 @@ namespace BlueArchiveAPI.Services
             // A first-time bootstrap (no resources present yet) still downloads so the server can start.
             bool hasExistingResources = Directory.Exists(DumpedDir)
                 && Directory.GetFiles(DumpedDir, "*", SearchOption.AllDirectories).Length > 0;
-            if (!Config.Instance.ServerConfiguration.AutoUpdateResources && hasExistingResources)
+            bool offlineMode = Environment.GetEnvironmentVariable("SCHALE_OFFLINE_MODE") == "1";
+            if ((!Config.Instance.ServerConfiguration.AutoUpdateResources || offlineMode) && hasExistingResources)
             {
-                Console.WriteLine($"{typeLabel} resources are out of date, but auto resource update is disabled; keeping existing resources.");
+                Console.WriteLine($"{typeLabel} resources are out of date, but {(offlineMode ? "offline mode is enabled" : "auto resource update is disabled")}; keeping existing resources.");
                 return;
             }
 

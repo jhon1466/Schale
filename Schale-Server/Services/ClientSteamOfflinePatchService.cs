@@ -119,7 +119,52 @@ namespace Schale_Server.Services
                 Hex("56 57 53 48 83 EC 30 80 3D 1C 3F 37 0D 00 75 4F 48 8D 0D B1 5B F1 0C E8"),
                 0,
                 Hex("56"),
-                Hex("C3"))
+                Hex("C3")),
+
+            // Steam 1.98.480345 signatures
+            new(
+                "steam.GetAuthToken.bypassBLoggedOn",
+                Hex("48 8B 15 B7 CC 5E 03 48 89 F1 E8 F7 A3 57 F8 48 89 C6 31 C9"),
+                20,
+                Hex("E8 3D 90 01 00 84 C0"),
+                Hex("90 90 90 90 90 31 C0")),
+            new(
+                "steam.GetAuthToken.tokenFromMessageLiteral",
+                Hex("48 8B 0D 83 83 4E 03 E8 16 2A BF F5 48 85 C0 0F 84 8B 00 00 00 48 89 C7 48 89 C1 31 D2 E8 F0 D7 F7 FF"),
+                34,
+                Hex("C7 47 10 96 44 2C 04 48 8B 15 02 BD 63 03 48 89 F9 48 83 C1 18 48 89 57 18"),
+                Hex("C7 47 10 00 00 00 00 48 8B 15 02 BD 63 03 48 89 F9 48 83 C1 20 48 89 57 20")),
+            new(
+                "steam.GetPurchasableProduct.bypassPriceFailure",
+                Hex("48 8B 0D AF 12 4E 03 83 B9 E0 00 00 00 00 75 05 E8 19 3C BD F5 48 89 F9 31 D2 E8 EF 57 E5 FF 84 DB"),
+                33,
+                Hex("74 69"),
+                Hex("90 90")),
+            new(
+                "steam.GetEntitlementsAsJsonArray.bypassPriceFailure",
+                Hex("48 8B 0D CF 00 4E 03 83 B9 E0 00 00 00 00 75 05 E8 39 2A BD F5 48 89 F9 31 D2 E8 0F 46 E5 FF 84 DB"),
+                33,
+                Hex("74 69"),
+                Hex("90 90")),
+            new(
+                "patchDownload.PreCheckForEnterGame.ignoreUnreachable",
+                Hex("45 31 C0 E8 D0 C8 DE 08 48 85 FF 0F 84 74 01 00 00 31 C9 E8 70 DB BE 00 31 C9 E8 29 B3 EC 09 85 C0"),
+                33,
+                Hex("74 3D"),
+                Hex("90 90")),
+            new(
+                "application.get_internetReachability.alwaysLan",
+                Hex("48 83 EC 28 48 8B 05 4D DF 4A 03 48 85 C0 74 07 48 83 C4 28 48 FF E0"),
+                0,
+                Hex("48 83 EC 28 48 8B"),
+                Hex("B8 02 00 00 00 C3")),
+            // ExternalPlatformSteam.GetConnectedNetworkStatus checks SteamUtils.GetServerRealTime() == 0 and reports 0x2719 (10009) offline.
+            new(
+                "steam.GetConnectedNetworkStatus.bypassServerRealTime",
+                Hex("48 8D 0D CB 00 64 03 E8 EE 6A BF F5 C6 05 89 EF 95 03 01 31 C9 E8 70 EF 01 00 85 C0"),
+                28,
+                Hex("74 64"),
+                Hex("90 90"))
         ];
 
         private readonly ILogger<ClientSteamOfflinePatchService> logger;

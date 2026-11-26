@@ -88,28 +88,31 @@ namespace Schale_Server.Controllers.SDK
                 _logger.LogWarning(ex, "Failed to parse incoming version-check body");
             }
 
-            // Try upstream first
-            try
+            // Try upstream first (skip in offline mode to avoid 5s timeout / loop on hosts redirect)
+            if (Environment.GetEnvironmentVariable("SCHALE_OFFLINE_MODE") != "1")
             {
-                using var upstreamReq = new HttpRequestMessage(HttpMethod.Post, UpstreamVersionCheckUrl);
-                upstreamReq.Content = new StringContent(upstreamBodyToSend, Encoding.UTF8, "application/json");
-                upstreamReq.Headers.Add("User-Agent", "Dalvik/2.1.0");
+                try
+                {
+                    using var upstreamReq = new HttpRequestMessage(HttpMethod.Post, UpstreamVersionCheckUrl);
+                    upstreamReq.Content = new StringContent(upstreamBodyToSend, Encoding.UTF8, "application/json");
+                    upstreamReq.Headers.Add("User-Agent", "Dalvik/2.1.0");
 
-                using var response = await _httpClient.SendAsync(upstreamReq);
-                if (response.IsSuccessStatusCode)
-                {
-                    var upstreamBody = await response.Content.ReadAsStringAsync();
-                    _logger.LogInformation("Upstream patch version-check succeeded for build {Version}", buildVersion);
-                    return Content(upstreamBody, "application/json");
+                    using var response = await _httpClient.SendAsync(upstreamReq);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var upstreamBody = await response.Content.ReadAsStringAsync();
+                        _logger.LogInformation("Upstream patch version-check succeeded for build {Version}", buildVersion);
+                        return Content(upstreamBody, "application/json");
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Upstream patch returned status {StatusCode}", response.StatusCode);
+                    }
                 }
-                else
+                catch (Exception ex)
                 {
-                    _logger.LogWarning("Upstream patch returned status {StatusCode}", response.StatusCode);
+                    _logger.LogWarning(ex, "Upstream Nexon patch check failed or timed out, returning fallback");
                 }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Upstream Nexon patch check failed or timed out, returning fallback");
             }
 
             // Fallback: report client version as latest so no unpacking/patching is required
@@ -124,7 +127,7 @@ namespace Schale_Server.Controllers.SDK
                 language = language,
                 patch = new
                 {
-                    patch_version = 1789,
+                    patch_version = patchVersion,
                     resource_path = GetResourcePath(),
                     bdiff_path = Array.Empty<object>()
                 }

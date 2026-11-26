@@ -87,6 +87,15 @@ namespace Schale_Server.Services
                 Hex("4C 8D 8C 24 D0 02 00 00 48 89 F1 BA 00 00 00 00 E8 C0 7F E3 FF"),
                 "mov edx,802010003 (IFInpay Failed Enter Request 1.96)",
                 "mov edx,0 (suppress IAP enter precondition error)"),
+            // Inface_GetNetworkAdapterConnectivity checks Windows network adapters via native code and returns 2 (disconnected)
+            // when Wi-Fi/Ethernet are off, causing the title screen to pop "Failed to connect to the network" even when loopback is up.
+            // Nopping `setne cl` (0F 95 C1 -> 90 90 90) leaves ecx=0 before `inc ecx`, so it always returns 1 (connected).
+            new(
+                "inface-network-adapter-always-connected-198",
+                Hex("48 83 EC 28 48 8B 89 80 02 00 00 E8 E0 45 2C 00 31 C9 83 F8 01 0F 95 C1 FF C1 89 C8 48 83 C4 28 C3"),
+                Hex("48 83 EC 28 48 8B 89 80 02 00 00 E8 E0 45 2C 00 31 C9 83 F8 01 90 90 90 FF C1 89 C8 48 83 C4 28 C3"),
+                "Inface_GetNetworkAdapterConnectivity (setne cl -> 1/2)",
+                "Inface_GetNetworkAdapterConnectivity (nop -> always connected)"),
             new(
                 "ims-public-api-base",
                 [.. Ascii.GetBytes("https://public.api.nexon.com/ims"), 0],

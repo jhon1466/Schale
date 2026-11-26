@@ -54,14 +54,13 @@ def load(loader):
         ctx.options.ignore_hosts = [f".*:{NGS_PROBE_PORT}"]
         return
     ctx.options.ignore_hosts = [
+        f"127.0.0.1:{SERVER_PORT}",
+        f"127.0.0.1:{GATEWAY_PORT}",
+        f"127.0.0.1:{IRC_PORT}",
         f"{SERVER_HOST}:{SERVER_PORT}",
         f"{SERVER_HOST}:{GATEWAY_PORT}",
         f"{SERVER_HOST}:{IRC_PORT}",
         f".*:{NGS_PROBE_PORT}",
-        # "gtable.inface.nexon.com",
-        # "public.api.nexon.com",
-        # "signin.nexon.com",
-        # "toy.log.nexon.io"
     ]
 
 print(f"Using IP Address: {SERVER_HOST}:{SERVER_PORT}")
@@ -80,6 +79,7 @@ REWRITE_HOST_LIST = [
 
     # Accounts / Auth / SDK backends
     'public.api.nexon.com',
+    'api-pub.nexon.com',
     'sandbox.api.nexon.com',
     'signin.nexon.com',
     'pre-signin.nexon.com',
@@ -243,6 +243,9 @@ def request(flow: http.HTTPFlow) -> None:
         flow.request.scheme = 'http'
         flow.request.host = SERVER_HOST
         flow.request.port = SERVER_PORT
+        return
+
+    if host in ('127.0.0.1', '127.0.0.3', 'localhost') and flow.request.port in (SERVER_PORT, GATEWAY_PORT):
         return
 
     if OFFLINE_MODE:

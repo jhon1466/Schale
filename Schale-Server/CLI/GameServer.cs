@@ -252,9 +252,24 @@ namespace Schale.CLI
                         Console.WriteLine("HTTPS on port 443 disabled (no certificate)");
                     }
                     
-                    options.Listen(System.Net.IPAddress.Any, apiPort);
-                    if (gatewayPort != apiPort)
-                        options.Listen(System.Net.IPAddress.Any, gatewayPort);
+                    if (Environment.GetEnvironmentVariable("SCHALE_OFFLINE_MODE") == "1")
+                    {
+                        var loopback1 = System.Net.IPAddress.Loopback;
+                        var loopback3 = System.Net.IPAddress.Parse("127.0.0.3");
+                        options.Listen(loopback1, apiPort);
+                        options.Listen(loopback3, apiPort);
+                        if (gatewayPort != apiPort)
+                        {
+                            options.Listen(loopback1, gatewayPort);
+                            options.Listen(loopback3, gatewayPort);
+                        }
+                    }
+                    else
+                    {
+                        options.Listen(System.Net.IPAddress.Any, apiPort);
+                        if (gatewayPort != apiPort)
+                            options.Listen(System.Net.IPAddress.Any, gatewayPort);
+                    }
                 });
                 Console.WriteLine($"HTTP on ports {apiPort} (API) & {gatewayPort} (Gateway)");
 
@@ -286,6 +301,38 @@ namespace Schale.CLI
 
                     var parcelHandler = scope.ServiceProvider.GetRequiredService<ParcelHandler>();
                     AccountInitializationService.Initialize(excelService, parcelHandler);
+
+                    if (Environment.GetEnvironmentVariable("SCHALE_OFFLINE_MODE") == "1"
+                        && !Config.Instance.ServerConfiguration.IsAndroidClient)
+                    {
+                        long? offlinePublisherId = null;
+                        var selectedId = Config.Instance.ServerConfiguration.SelectedAccountId;
+                        if (selectedId > 0)
+                        {
+                            offlinePublisherId = await context.Accounts
+                                .Where(a => a.ServerId == selectedId && a.PublisherAccountId != null)
+                                .Select(a => a.PublisherAccountId)
+                                .FirstOrDefaultAsync();
+                        }
+
+                        if (offlinePublisherId == null)
+                        {
+                            offlinePublisherId = await context.Accounts
+                                .Where(a => a.PublisherAccountId != null)
+                                .OrderByDescending(a => !string.IsNullOrEmpty(a.Nickname))
+                                .ThenByDescending(a => a.Level)
+                                .ThenByDescending(a => a.LastConnectTime)
+                                .ThenBy(a => a.ServerId)
+                                .Select(a => a.PublisherAccountId)
+                                .FirstOrDefaultAsync();
+                        }
+
+                        if (offlinePublisherId != null)
+                        {
+                            Schale_Server.Controllers.SDK.GuestDeviceIdentity.SetOfflineFallbackPublisherId(offlinePublisherId);
+                            Log.Information("Offline mode pinned Steam identity to existing PublisherAccountId={PublisherAccountId}", offlinePublisherId);
+                        }
+                    }
 
                     // A client update replaces ExcelDB.db and takes the forced dates with it, so re-apply whatever the operator left switched on. The cached world raid manifest rides the same pass.
                     if (Schale_Server.Services.EventScheduleService.Configured || Schale_Server.Services.WorldRaidService.Manifest != null)

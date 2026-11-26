@@ -215,10 +215,11 @@ namespace BlueArchiveAPI.Services
                 _logger.LogWarning(ex, "Failed to load version cache.");
             }
 
-            if (!forceRefresh && cache != null && 
-                !string.IsNullOrEmpty(cache.VersionId) && 
+            bool offlineMode = Environment.GetEnvironmentVariable("SCHALE_OFFLINE_MODE") == "1";
+            if (!forceRefresh && cache != null &&
+                !string.IsNullOrEmpty(cache.VersionId) &&
                 !string.IsNullOrEmpty(cache.CdnBaseUrl) &&
-                (DateTime.UtcNow - cache.LastUpdatedUtc).TotalHours < 12)
+                (offlineMode || (DateTime.UtcNow - cache.LastUpdatedUtc).TotalHours < 12))
             {
                 _logger.LogInformation("Using cached VersionId: {VersionId} (Last updated: {LastUpdated})", cache.VersionId, cache.LastUpdatedUtc);
                 return (cache.VersionId, cache.CdnBaseUrl);

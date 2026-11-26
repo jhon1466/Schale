@@ -18,6 +18,27 @@ internal static class GuestDeviceIdentity
     private const ulong LocalSuffixRange = 10_000_000_000UL;
     private static readonly ConcurrentDictionary<string, (string Seed, DateTimeOffset SeenAt)> SeedsByClientAddress = new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, string> PublisherIdsByDeviceKey = new(StringComparer.Ordinal);
+    private static volatile string? OfflineFallbackLocalId;
+
+    public static void SetOfflineFallbackPublisherId(long? publisherId)
+    {
+        if (publisherId == null || publisherId <= 0)
+        {
+            OfflineFallbackLocalId = null;
+            return;
+        }
+
+        var text = publisherId.Value.ToString(CultureInfo.InvariantCulture);
+        if (string.Equals(text, LegacyPublisherId, StringComparison.Ordinal))
+        {
+            OfflineFallbackLocalId = LegacyLocalId;
+            return;
+        }
+
+        OfflineFallbackLocalId = text.Length >= 10
+            ? "7656119" + text[^10..]
+            : null;
+    }
 
     public static bool IsLegacyLocalSessionUserId(string? value)
         => string.Equals(value, LegacyLocalId, StringComparison.Ordinal);
@@ -32,20 +53,30 @@ internal static class GuestDeviceIdentity
             // When there was no earlier Toy request, use the address as a last-resort
             // guest key instead of assigning every anonymous install the same account.
             seed = ReadClientAddress(request);
-            if (seed == null)
-                return LegacyLocalId;
         }
 
-        var deviceKey = DeviceKey(seed);
-        if (PublisherIdsByDeviceKey.TryGetValue(deviceKey, out var publisherId))
+        if (seed != null)
         {
-            // Private account recovery can bind a device to the pre-existing legacy game profile.
-            // Keep that profile's original local id/GUID instead of deriving a new publisher id.
-            if (string.Equals(publisherId, LegacyPublisherId, StringComparison.Ordinal))
-                return LegacyLocalId;
+            var deviceKey = DeviceKey(seed);
+            if (PublisherIdsByDeviceKey.TryGetValue(deviceKey, out var publisherId))
+            {
+                // Private account recovery can bind a device to the pre-existing legacy game profile.
+                // Keep that profile's original local id/GUID instead of deriving a new publisher id.
+                if (string.Equals(publisherId, LegacyPublisherId, StringComparison.Ordinal))
+                    return LegacyLocalId;
 
-            return "7656119" + publisherId[^10..];
+                return "7656119" + publisherId[^10..];
+            }
         }
+
+        // In Full Offline Mode on PC, disabling Wi-Fi/Ethernet changes the active NIC MAC address
+        // that Nexon's Toy SDK hashes into its uuid header. Reuse the existing primary account's
+        // Steam local ID so offline mode logs into the same Sensei account instead of creating a new one.
+        if (!string.IsNullOrWhiteSpace(OfflineFallbackLocalId))
+            return OfflineFallbackLocalId;
+
+        if (seed == null)
+            return LegacyLocalId;
 
         return "7656119" + Suffix(seed, LocalSuffixRange, 10);
     }
