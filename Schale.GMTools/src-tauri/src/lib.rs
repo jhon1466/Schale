@@ -20,6 +20,7 @@ pub fn run() {
             manager::manager_logs,
             manager::manager_clear_logs,
             manager::manager_save_settings,
+            manager::manager_pick_folder,
             manager::manager_open,
             manager::manager_play,
             manager::api_request,

@@ -2,6 +2,7 @@ import { For, Show, createMemo, createSignal, onCleanup, onMount, type JSX } fro
 import { listen } from '@tauri-apps/api/event';
 import ServerPanel from './ServerPanel';
 import { QuickActions, StudentsPanel, runCommand } from './AdminTools';
+import { AronaSpine } from './AronaSpine';
 import { api, call, get, short, uptime, type Progress, type Status, type UpdateInfo } from '../lib/api';
 import { currentLang, fmt, setLang, tr, type Lang } from '../lib/i18n';
 
@@ -100,7 +101,15 @@ export default function GMApp() {
         </div>
 
         <div class="relative mt-auto">
-          <img src="/game-ui/Image_Char_Arona2.png" alt="" class="float pointer-events-none mx-auto -mb-2 w-[150px] drop-shadow-[0_8px_16px_#0006]"/>
+          <img
+            src="/game-ui/Image_Char_Arona2.png"
+            alt="Arona"
+            onClick={() => {
+              const quotes = tr().aronaQuotes;
+              notify(quotes[Math.floor(Math.random() * quotes.length)]);
+            }}
+            class="float mx-auto -mb-2 w-[150px] cursor-pointer drop-shadow-[0_8px_16px_#0006] transition hover:scale-105"
+          />
           <button class="primary-button w-full" disabled={!status()?.gameFound} title={status()?.gameFound ? tr().openGame : tr().noGame}
             onClick={() => void call('manager_play').catch((e) => notify(String(e), true))}>
             <span class="flex items-center gap-2"><Fa icon="fa-solid fa-gamepad"/> {tr().play}</span>
@@ -120,11 +129,11 @@ export default function GMApp() {
           <div class="flex items-center gap-3">
             <label class="flex items-center gap-1.5 rounded-md bg-white/20 px-2.5 py-1.5 text-[11px] font-bold text-white backdrop-blur">
               <Fa icon="fa-solid fa-globe"/>
-              <select class="cursor-pointer bg-transparent text-white outline-none" value={currentLang()} onChange={(e) => setLang(e.currentTarget.value as Lang)}>
-                <option value="es" class="text-ink-900">Español</option>
-                <option value="en" class="text-ink-900">English</option>
-                <option value="zh" class="text-ink-900">中文</option>
-                <option value="ja" class="text-ink-900">日本語</option>
+              <select class="cursor-pointer bg-transparent text-white outline-none" style={{ "color-scheme": "light" }} value={currentLang()} onChange={(e) => setLang(e.currentTarget.value as Lang)}>
+                <option value="es" style={{ background: "#ffffff", color: "#1b2c40" }}>Español</option>
+                <option value="en" style={{ background: "#ffffff", color: "#1b2c40" }}>English</option>
+                <option value="zh" style={{ background: "#ffffff", color: "#1b2c40" }}>中文</option>
+                <option value="ja" style={{ background: "#ffffff", color: "#1b2c40" }}>日本語</option>
               </select>
             </label>
             <label class="flex items-center gap-2 rounded-md bg-white/20 px-3 py-1.5 text-[11px] font-bold backdrop-blur">
@@ -187,16 +196,34 @@ const needUid = (uid: string, notify: (m: string, e?: boolean) => void) => {
 
 function Overview(props: { status?: Status; go: (t: Tab) => void }) {
   const s = () => props.status;
-  const message = () => !s()?.installed ? tr().aronaNotInst
+  const [quoteIdx, setQuoteIdx] = createSignal<number | null>(null);
+  const statusMessage = () => !s()?.installed ? tr().aronaNotInst
     : s()?.update.updateAvailable ? fmt(s()?.settings.autoUpdate ? tr().aronaUpdAuto : tr().aronaUpdMan, { sha: short(s()?.update.remoteSha) })
+    : s()?.running && s()?.settings.offlineMode ? tr().aronaOffline
     : s()?.running ? tr().aronaOk
     : tr().aronaIdle;
+  const message = () => {
+    const idx = quoteIdx();
+    if (idx === null) return statusMessage();
+    const quotes = tr().aronaQuotes;
+    return quotes[idx % quotes.length];
+  };
+  const nextQuote = () => {
+    const quotes = tr().aronaQuotes;
+    setQuoteIdx((prev) => (prev === null ? 0 : (prev + 1) % quotes.length));
+  };
+  onMount(() => {
+    const id = setInterval(() => {
+      if (s()?.running) nextQuote();
+    }, 22000);
+    onCleanup(() => clearInterval(id));
+  });
   return <>
-    <section class="arona-hero mb-6 flex items-center gap-6 p-6">
-      <img src="/game-ui/Image_Char_Arona.png" alt="Arona" class="size-28 rounded-full border-4 border-white shadow-lg"/>
+    <section class="arona-hero mb-6 flex items-center gap-6 px-6 py-4">
+      <AronaSpine onInteract={nextQuote}/>
       <div class="max-w-xl">
         <div class="label-sm mb-2 text-ba-blue">{tr().aronaTitle}</div>
-        <div class="arona-bubble">{message()}</div>
+        <div class="arona-bubble cursor-pointer transition hover:shadow-md" onClick={nextQuote}>{message()}</div>
         <div class="mt-4 flex gap-3">
           <Btn kind="yellow" onClick={() => props.go('server')}><Fa icon="fa-solid fa-server"/> {tr().goServer}</Btn>
           <Btn kind="secondary" onClick={() => props.go('accounts')}><Fa icon="fa-solid fa-users"/> {tr().accounts}</Btn>

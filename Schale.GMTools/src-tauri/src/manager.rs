@@ -46,6 +46,7 @@ pub struct AppSettings {
     pub poll_minutes: u64,
     pub restart_after_update: bool,
     pub game_dir: String,
+    pub offline_mode: bool,
 }
 
 impl Default for AppSettings {
@@ -59,6 +60,7 @@ impl Default for AppSettings {
             poll_minutes: 5,
             restart_after_update: true,
             game_dir: r"C:\Program Files (x86)\Steam\steamapps\common\BlueArchive".into(),
+            offline_mode: false,
         }
     }
 }
@@ -457,7 +459,9 @@ const REDIRECT_HOSTS: &[&str] = &[
     "nxm-th-bagl.nexon.com",
     "nxm-or-bagl.nexon.com",
     "public.api.nexon.com",
+    "api-pub.nexon.com",
     "sandbox.api.nexon.com",
+    "store.steampowered.com",
     "signin.nexon.com",
     "pre-signin.nexon.com",
     "test-signin.nexon.com",
@@ -586,22 +590,44 @@ fn start_proxy_if_available(state: &Manager, s: &AppSettings) {
     }
 
     let mut cmd = Command::new(&mitmdump);
-    // Same mode as autorun.ps1 (the setup known to log in): intercept only BlueArchive.exe's traffic
-    // and let redirect_server.py route it. No reverse proxy / hosts file.
     let script_dir = script.parent().map(Path::to_path_buf).unwrap_or_default();
     cmd.current_dir(&script_dir)
-        .env_remove("SCHALE_OFFLINE_MODE")
-        .args([
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    if s.offline_mode {
+        if let Err(e) = set_hosts_redirect(true) {
+            push_log(&state.logs, format!("[gm-tools] No se pudo escribir hosts para modo offline (ejecuta GM Tools como Administrador): {e}"));
+        }
+        cmd.env("SCHALE_OFFLINE_MODE", "1").args([
+            "--mode",
+            "reverse:http://127.0.0.3:5000@127.0.0.2:443",
+            "--mode",
+            "reverse:http://127.0.0.3:5000@127.0.0.2:80",
+            "--mode",
+            "reverse:http://127.0.0.3:5000@127.0.0.2:5000",
+            "--mode",
+            "reverse:http://127.0.0.3:5100@127.0.0.2:5100",
+            "--set",
+            "keep_host_header=true",
+            "--set",
+            "connection_strategy=lazy",
+            "--no-http2",
+            "--set",
+            "termlog_verbosity=warn",
+            "-s",
+        ]);
+    } else {
+        // Intercept only BlueArchive.exe's traffic via WinDivert (no hosts file or admin required).
+        cmd.env_remove("SCHALE_OFFLINE_MODE").args([
             "--mode",
             "local:BlueArchive.exe",
             "--no-http2",
             "--set",
             "termlog_verbosity=warn",
             "-s",
-        ])
-        .arg(&script)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
+        ]);
+    }
+    cmd.arg(&script);
     hidden(&mut cmd);
     match cmd.spawn() {
         Ok(mut child) => {
@@ -631,9 +657,12 @@ fn start_proxy_if_available(state: &Manager, s: &AppSettings) {
             if let Ok(mut g) = state.proxy_child.lock() {
                 *g = Some(child);
             }
-            // Clean up hosts entries left by older GM Tools versions.
-            let _ = set_hosts_redirect(false);
-            push_log(&state.logs, "[gm-tools] mitmproxy iniciado en modo local:BlueArchive.exe.".into());
+            if !s.offline_mode {
+                let _ = set_hosts_redirect(false);
+                push_log(&state.logs, "[gm-tools] mitmproxy iniciado en modo local:BlueArchive.exe.".into());
+            } else {
+                push_log(&state.logs, "[gm-tools] mitmproxy iniciado en modo FULL OFFLINE (127.0.0.2:443 y :80).".into());
+            }
         }
         Err(e) => {
             push_log(&state.logs, format!("[gm-tools] No se pudo iniciar mitmdump: {e}"));
@@ -702,6 +731,17 @@ fn start_internal(app: &AppHandle) -> Result<String, String> {
         .env("NO_PROXY", "*")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+    let game_dir = s.game_dir.trim();
+    if !game_dir.is_empty() && Path::new(game_dir).is_dir() {
+        cmd.env("SCHALE_CLIENT_INSTALL_DIR", game_dir);
+    }
+    if s.offline_mode {
+        cmd.env("SCHALE_OFFLINE_MODE", "1")
+            .env("SCHALE_AUTO_PATCH_STEAM_OFFLINE", "true");
+    } else {
+        cmd.env_remove("SCHALE_OFFLINE_MODE")
+            .env_remove("SCHALE_AUTO_PATCH_STEAM_OFFLINE");
+    }
     hidden(&mut cmd);
     let mut child = cmd.spawn().map_err(|e| format!("No se pudo iniciar {SERVER_EXE}: {e}"))?;
     for (stream, prefix) in [
@@ -855,6 +895,37 @@ pub fn manager_save_settings(settings: AppSettings) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub async fn manager_pick_folder(initial: Option<String>) -> Result<Option<String>, String> {
+    #[cfg(windows)]
+    {
+        return tauri::async_runtime::spawn_blocking(move || {
+            let init = initial.unwrap_or_default().replace('\'', "''");
+            let script = format!(
+                "Add-Type -AssemblyName System.Windows.Forms; \
+                 $d = New-Object System.Windows.Forms.FolderBrowserDialog; \
+                 $d.ShowNewFolderButton = $false; \
+                 $init = '{init}'; \
+                 if ($init -and (Test-Path -LiteralPath $init)) {{ $d.SelectedPath = $init }}; \
+                 if ($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {{ [Console]::Out.Write($d.SelectedPath) }}"
+            );
+            let mut cmd = Command::new("powershell.exe");
+            cmd.args(["-NoProfile", "-STA", "-Command", &script]);
+            hidden(&mut cmd);
+            let out = cmd.output().map_err(|e| e.to_string())?;
+            let path = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            Ok(if path.is_empty() { None } else { Some(path) })
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = initial;
+        Ok(None)
+    }
+}
+
+#[tauri::command]
 pub fn manager_open(which: String) -> Result<(), String> {
     let s = load_settings();
     let dir = match which.as_str() {
@@ -873,6 +944,19 @@ pub fn manager_play() -> Result<(), String> {
     let exe = Path::new(&s.game_dir).join("BlueArchive.exe");
     if !exe.is_file() {
         return Err("No se encontró BlueArchive.exe en la carpeta configurada.".into());
+    }
+    #[cfg(windows)]
+    {
+        if let Ok(out) = hidden(Command::new("tasklist.exe").args(["/FI", "IMAGENAME eq BlueArchive.exe", "/NH"])).output() {
+            let txt = String::from_utf8_lossy(&out.stdout);
+            if txt.to_ascii_lowercase().contains("bluearchive.exe") {
+                return Err("Blue Archive ya está en ejecución.".into());
+            }
+        }
+        // Launch via Steam URI so SteamAPI_RestartAppIfNecessary doesn't spawn a second instance in Offline Mode.
+        if hidden(Command::new("cmd.exe").args(["/C", "start", "", "steam://rungameid/3557620"])).spawn().is_ok() {
+            return Ok(());
+        }
     }
     Command::new(&exe).current_dir(&s.game_dir).spawn().map_err(|e| e.to_string())?;
     Ok(())

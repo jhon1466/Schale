@@ -4,7 +4,7 @@ export type CommitInfo = { sha: string; message: string; author: string; date: s
 export type UpdateInfo = { checkedAt: number; remoteSha: string | null; updateAvailable: boolean; commits: CommitInfo[]; error: string | null };
 export type Settings = {
   apiUrl: string; repoUrl: string; branch: string; sourceDir: string; autoUpdate: boolean;
-  pollMinutes: number; restartAfterUpdate: boolean; gameDir: string;
+  pollMinutes: number; restartAfterUpdate: boolean; gameDir: string; offlineMode: boolean;
 };
 export type Status = {
   appVersion: string; installed: boolean; running: boolean; busy: boolean; uptimeSeconds: number | null;

@@ -135,6 +135,11 @@ export default function ServerPanel(props: Props) {
             <input type="checkbox" class="toggle" checked={settings()?.restartAfterUpdate ?? true}
               onChange={(e) => void save({ ...(settings() as Settings), restartAfterUpdate: e.currentTarget.checked })}/>
           </label>
+          <label class="mb-4 flex items-center justify-between gap-3 text-[13px] font-semibold">
+            <span>{tr().offlineMode} <small class="block text-[11px] font-normal text-ink-500">{tr().offlineModeHint}</small></span>
+            <input type="checkbox" class="toggle" checked={settings()?.offlineMode ?? false}
+              onChange={(e) => void save({ ...(settings() as Settings), offlineMode: e.currentTarget.checked })}/>
+          </label>
           <div class="grid grid-cols-[1fr_110px_110px] gap-3">
             <label class="field-label">{tr().repo}<input class="input-field" value={settings()?.repoUrl ?? ''} onInput={(e) => edit('repoUrl', e.currentTarget.value)}/></label>
             <label class="field-label">{tr().branch}<input class="input-field" value={settings()?.branch ?? ''} onInput={(e) => edit('branch', e.currentTarget.value)}/></label>
@@ -144,7 +149,15 @@ export default function ServerPanel(props: Props) {
             <input class="input-field" placeholder={s()?.sourceDir} value={settings()?.sourceDir ?? ''} onInput={(e) => edit('sourceDir', e.currentTarget.value)}/></label>
           <div class="grid grid-cols-2 gap-3">
             <label class="field-label">{tr().serverApi}<input class="input-field" value={settings()?.apiUrl ?? ''} onInput={(e) => edit('apiUrl', e.currentTarget.value)}/></label>
-            <label class="field-label">{tr().baFolder}<input class="input-field" value={settings()?.gameDir ?? ''} onInput={(e) => edit('gameDir', e.currentTarget.value)}/></label>
+            <label class="field-label">{tr().baFolder}
+              <div class="flex gap-1.5">
+                <input class="input-field min-w-0 flex-1" value={settings()?.gameDir ?? ''} onInput={(e) => edit('gameDir', e.currentTarget.value)}/>
+                <button type="button" class="quiet-button shrink-0 px-2.5" disabled={working()} onClick={async () => {
+                  const picked = await call<string | null>('manager_pick_folder', { initial: settings()?.gameDir ?? '' });
+                  if (picked) edit('gameDir', picked);
+                }}><i class="fa-solid fa-folder-open"/></button>
+              </div>
+            </label>
           </div>
           <div class="flex flex-wrap gap-2">
             <button class="primary-button" disabled={!draft() || working()} onClick={() => void save()}><span class="flex items-center gap-2"><i class="fa-solid fa-floppy-disk"/> {tr().save}</span></button>
