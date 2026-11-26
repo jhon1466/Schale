@@ -106,7 +106,8 @@ public static class EventScheduleService
             using var conn = new SqliteConnection(new SqliteConnectionStringBuilder
             {
                 DataSource = dbPath,
-                Mode = SqliteOpenMode.ReadWrite
+                Mode = SqliteOpenMode.ReadWrite,
+                Pooling = false
             }.ToString());
             conn.Open();
             ApplyKey(conn);

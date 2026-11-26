@@ -18,16 +18,22 @@ public class ItemHandler : ProtocolHandlerBase
     private readonly ISessionKeyService _sessionService;
     private readonly IMapper _mapper;
     private readonly ItemManager _itemManager;
+    private readonly ExcelTableService _excelService;
+    private readonly ILogger<ItemHandler> _logger;
 
     public ItemHandler(
         IProtocolHandlerRegistry registry,
         ISessionKeyService sessionService,
         IMapper mapper,
-        ItemManager itemManager) : base(registry)
+        ItemManager itemManager,
+        ExcelTableService excelService,
+        ILogger<ItemHandler> logger) : base(registry)
     {
         _sessionService = sessionService;
         _mapper = mapper;
         _itemManager = itemManager;
+        _excelService = excelService;
+        _logger = logger;
     }
 
     [ProtocolHandler(Protocol.Item_List)]
@@ -38,7 +44,24 @@ public class ItemHandler : ProtocolHandlerBase
     {
         var account = await _sessionService.GetAuthenticatedUser(db, request.SessionKey);
 
-        response.ItemDBs = db.GetAccountItems(account.ServerId).ToMapList(_mapper);
+        var items = db.GetAccountItems(account.ServerId).ToList();
+        if (_excelService.IsTableComplete<ItemExcelT>())
+        {
+            var validIds = _excelService.GetTable<ItemExcelT>().Select(x => x.Id).ToHashSet();
+            var unknown = items.Where(x => !validIds.Contains(x.UniqueId)).ToList();
+            if (unknown.Count > 0)
+            {
+                // Client ItemObject..ctor dereferences ItemExcel without a null guard and hangs login if any item is missing from ExcelDB.
+                _logger.LogWarning(
+                    "Filtering {Count} item(s) with no ItemExcel entry for account {AccountId}: {UniqueIds}",
+                    unknown.Count,
+                    account.ServerId,
+                    string.Join(", ", unknown.Select(x => x.UniqueId)));
+                items = items.Where(x => validIds.Contains(x.UniqueId)).ToList();
+            }
+        }
+
+        response.ItemDBs = items.ToMapList(_mapper);
         response.ExpiryItemDBs = [];
 
         return response;

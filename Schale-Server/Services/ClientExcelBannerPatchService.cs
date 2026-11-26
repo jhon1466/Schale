@@ -93,7 +93,8 @@ namespace Schale_Server.Services
             using var conn = new SqliteConnection(new SqliteConnectionStringBuilder
             {
                 DataSource = dbPath,
-                Mode = SqliteOpenMode.ReadWrite
+                Mode = SqliteOpenMode.ReadWrite,
+                Pooling = false
             }.ToString());
             conn.Open();
             ApplyKey(conn);
@@ -185,7 +186,7 @@ namespace Schale_Server.Services
                 return [];
             try
             {
-                using var conn = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = pristine, Mode = SqliteOpenMode.ReadOnly }.ToString());
+                using var conn = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = pristine, Mode = SqliteOpenMode.ReadOnly, Pooling = false }.ToString());
                 conn.Open();
                 ApplyKey(conn);
                 using var cmd = conn.CreateCommand();
